@@ -57,7 +57,7 @@ class EmailAlertSource:
         for s in cfg.get("remitentes", []):
             self.senders.append({
                 "name": s["nombre"],
-                "from": s["de"],
+                "from": s["de"] if isinstance(s["de"], list) else [s["de"]],
                 "link_re": re.compile(s["enlace_regex"]),
                 "id_re": re.compile(s["id_regex"]) if s.get("id_regex") else None,
                 "url_id": s.get("url_id", ""),
@@ -113,8 +113,10 @@ class EmailAlertSource:
             imap.login(self.user, self.password)
             imap.select("INBOX", readonly=True)  # no marca los correos como leídos
             for sender in self.senders:
-                _, data = imap.search(None, "SINCE", since, "FROM", f'"{sender["from"]}"')
-                ids = data[0].split() if data and data[0] else []
+                ids = []
+                for addr in sender["from"]:
+                    _, data = imap.search(None, "SINCE", since, "FROM", f'"{addr}"')
+                    ids += data[0].split() if data and data[0] else []
                 found = 0
                 for msg_id in ids[-40:]:
                     _, msg_data = imap.fetch(msg_id, "(BODY.PEEK[])")

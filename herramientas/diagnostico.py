@@ -67,7 +67,8 @@ def resumir_correos():
     with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
         imap.login(user, pwd)
         imap.select("INBOX", readonly=True)
-        for remitente in ("indeed.com", "linkedin.com", "magneto365.com"):
+        for remitente in ("jobalert.indeed.com", "alert@indeed.com", "jobalerts-noreply@linkedin.com",
+                          "magneto365.com"):
             _, data = imap.search(None, "FROM", f'"{remitente}"')
             ids = data[0].split() if data and data[0] else []
             print(f"\n=== correos de {remitente}: {len(ids)} ===")
@@ -81,9 +82,13 @@ def resumir_correos():
                 vistos = set()
                 for a in soup.find_all("a", href=True):
                     u = urlparse(a["href"].replace("&amp;", "&"))
+                    if "/in/" in u.path:  # enlaces a perfiles personales: se omiten
+                        continue
                     patron = f"{u.netloc}{re.sub(r'[0-9a-f]{8,}|\\d{5,}', '<id>', u.path)}"
                     claves = ",".join(sorted(parse_qs(u.query)))
-                    texto = a.get_text(" ", strip=True)[:45]
+                    # Solo se muestra el texto de enlaces a vacantes (no nombres, perfiles, etc.).
+                    es_vacante = re.search(r"jobs/view|viewjob|rc/clk|pagead/clk|/empleos?/", u.path)
+                    texto = a.get_text(" ", strip=True)[:45] if es_vacante else ""
                     fila = (patron, claves, texto)
                     if fila in vistos:
                         continue

@@ -132,17 +132,19 @@ fuentes:
   - nombre: elempleo
     tipo: html
     activa: true
-    url: https://www.elempleo.com/co/ofertas-empleo/antioquia/trabajo-{q}
+    # La ruta /antioquia/ no filtra por departamento; /medellin/ sí.
+    url: https://www.elempleo.com/co/ofertas-empleo/medellin/trabajo-{q}
     enlace_regex: '/co/ofertas-trabajo/[a-z0-9-]+-\d+'
     base: https://www.elempleo.com
 
-  # En oct-2026 sus páginas de búsqueda devolvían error 500; se deja activa para
-  # reintentar (si falla, el bot lo registra y sigue con las demás fuentes).
+  # Las búsquedas por cargo de Magneto responden error 500 (oct-2026); se usa el
+  # listado general de Medellín (sin {q}: se descarga una sola vez por ejecución)
+  # y los filtros del bot se encargan de dejar solo las de sistemas.
   - nombre: magneto
     tipo: html
     activa: true
-    url: https://www.magneto365.com/co/trabajos/ofertas-empleo-{q}-en-antioquia
-    enlace_regex: '/co/empleos/[^"?#]+'
+    url: https://www.magneto365.com/co/trabajos/ofertas-empleo-en-medellin
+    enlace_regex: '/co/empleos/[^"?#\\]+'
     base: https://www.magneto365.com
 
   # Alertas que LinkedIn, Indeed y Magneto te envían a tu Gmail. El bot las lee
@@ -154,12 +156,13 @@ fuentes:
     dias: 3                 # revisa los correos de los últimos N días
     remitentes:
       - nombre: linkedin
-        de: linkedin.com
+        de: [jobalerts-noreply@linkedin.com]   # solo alertas, no confirmaciones
         enlace_regex: 'https?://(?:[a-z]+\.)?linkedin\.com/(?:comm/)?jobs/view/(\d+)'
         url_id: https://www.linkedin.com/jobs/view/{id}/
       - nombre: indeed
-        de: indeed.com
-        enlace_regex: 'https?://[a-z.]*indeed\.com/[^"\s<>]+'
+        # Solo correos de ALERTAS (no las confirmaciones de postulación).
+        de: [jobalert.indeed.com, alert@indeed.com]
+        enlace_regex: 'https?://[a-z.]*indeed\.com/(?:rc/clk|pagead/clk|viewjob|m/viewjob)[^"\s<>]*'
         id_regex: '[?&]jk=([0-9a-f]+)'
         url_id: https://co.indeed.com/viewjob?jk={id}
       - nombre: magneto

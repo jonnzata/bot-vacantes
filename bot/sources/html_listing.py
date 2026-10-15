@@ -36,6 +36,7 @@ class HtmlListingSource:
         self.link_re = re.compile(cfg["enlace_regex"])
         self.base = cfg.get("base", "")
         self.http = http
+        self._fetched = set()
 
     def parse_listing(self, html: str) -> list:
         soup = BeautifulSoup(html, "html.parser")
@@ -54,6 +55,9 @@ class HtmlListingSource:
 
     def search(self, query: str) -> list:
         url = self.url_tpl.format(q=_slug(query))
+        if url in self._fetched:  # URL sin {q}: basta con descargarla una vez
+            return []
+        self._fetched.add(url)
         resp = self.http.get(url)
         jobs = self.parse_listing(resp.text)
         log.info("%s: %d ofertas para %r", self.name, len(jobs), query)
