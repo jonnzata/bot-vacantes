@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 from .models import Job
@@ -33,9 +34,13 @@ class JobFilter:
     def is_recent(self, job: Job) -> bool:
         if not self.max_days or not job.published:
             return True
+        # Algunos portales envían fechas sin ceros (ej. elempleo: "2026-8-26").
+        m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", job.published)
         try:
-            published = date.fromisoformat(job.published[:10])
+            published = date(int(m[1]), int(m[2]), int(m[3])) if m else None
         except ValueError:
+            published = None
+        if published is None:
             return True
         return published >= date.today() - timedelta(days=self.max_days)
 
