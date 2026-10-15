@@ -121,3 +121,20 @@ def test_jooble_parse_and_message():
     assert job.title == "Soporte TI" and job.source == "jooble (elempleo.com)"
     text = job_to_text(job)
     assert "https://jooble.org/desc/1" in text and "Medellín" in text
+
+
+def test_rejects_old_job_with_unpadded_date():
+    # elempleo envía fechas sin ceros, p. ej. "2026-8-26"
+    old = date.today() - timedelta(days=60)
+    job = Job(title="Desarrollador Python", url="u", source="t", location="Medellín",
+              published=f"{old.year}-{old.month}-{old.day}")
+    assert not make_filter().accept(job)
+
+
+def test_elempleo_regex_matches_real_links():
+    src = next(f for f in CONFIG["fuentes"] if f["nombre"] == "elempleo")
+    html = ('<a href="/co/ofertas-trabajo/auxiliar-de-sistemas-1886758163">Auxiliar de sistemas</a>'
+            '<a href="https://web.whatsapp.com/send?text=https://www.elempleo.com/co/ofertas-trabajo/'
+            'auxiliar-de-sistemas-1886758163"></a>')
+    jobs = HtmlListingSource(src, http=None).parse_listing(html)
+    assert [j.url for j in jobs] == ["https://www.elempleo.com/co/ofertas-trabajo/auxiliar-de-sistemas-1886758163"]
