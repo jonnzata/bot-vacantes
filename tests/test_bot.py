@@ -144,3 +144,47 @@ def test_interleave_alternates_sources():
     from bot.main import interleave
     jobs = ["a1", "a2", "a3", "b1"]
     assert interleave(jobs, key=lambda j: j[0]) == ["a1", "b1", "a2", "a3"]
+
+
+LINKEDIN_ALERT = """
+<table><tr><td>
+  <a href="https://www.linkedin.com/comm/jobs/view/4011223344/?trackingId=abc&amp;refId=x"><img src="logo.png"></a>
+  <table><tr><td>
+    <a href="https://www.linkedin.com/comm/jobs/view/4011223344/?trackingId=abc">Ingeniero de Soporte TI</a>
+    <p>ACME S.A.S · Medellín, Antioquia, Colombia</p>
+  </td></tr></table>
+</td></tr>
+<tr><td><a href="https://www.linkedin.com/comm/jobs/view/4099887766/?t=1">Analista de Redes</a>
+  <p>Otra Empresa · Bogotá, Distrito Capital, Colombia</p></td></tr>
+<tr><td><a href="https://www.linkedin.com/comm/jobs/search?keywords=sistemas">Ver todos los empleos</a></td></tr>
+</table>
+"""
+
+
+def _email_source():
+    from bot.sources.email_alerts import EmailAlertSource
+    cfg = next(f for f in CONFIG["fuentes"] if f["tipo"] == "correo")
+    return EmailAlertSource(cfg)
+
+
+def test_linkedin_alert_email():
+    src = _email_source()
+    jobs = src.parse_alert(LINKEDIN_ALERT, src.senders[0])
+    assert [j.title for j in jobs] == ["Ingeniero de Soporte TI", "Analista de Redes"]
+    assert jobs[0].url == "https://www.linkedin.com/jobs/view/4011223344/"
+    flt = make_filter()
+    assert flt.accept(jobs[0])        # Medellín
+    assert not flt.accept(jobs[1])    # Bogotá
+
+
+def test_indeed_alert_email_uses_job_key():
+    src = _email_source()
+    indeed = next(s for s in src.senders if s["name"] == "indeed")
+    html = ('<div><a href="https://co.indeed.com/rc/clk/dl?jk=9f8e7d6c5b4a&amp;from=ja">Técnico de sistemas</a>'
+            '<p>Datelco - Bello, Antioquia</p></div>'
+            '<div><a href="https://co.indeed.com/rc/clk/dl?jk=1234abcd&amp;from=ja">Desarrollador Java</a>'
+            '<p>Foo - Envigado, Antioquia</p></div>')
+    jobs = src.parse_alert(html, indeed)
+    assert [j.url for j in jobs] == ["https://co.indeed.com/viewjob?jk=9f8e7d6c5b4a",
+                                     "https://co.indeed.com/viewjob?jk=1234abcd"]
+    assert jobs[0].uid != jobs[1].uid

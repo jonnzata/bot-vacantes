@@ -74,20 +74,27 @@ def run(config_path: Path, dry_run: bool) -> list:
     candidates = interleave(candidates, by_source)
     log.info("%d vacantes nuevas por revisar (%s)", len(candidates), _count(candidates))
 
-    accepted, details = [], 0
+    accepted, details, reasons = [], 0, {}
     for job in candidates:
         if not job.enriched and details < run_cfg.get("max_detalles", 60):
             details += 1
             try:
                 job._source.enrich(job)
             except Exception as exc:
-                log.debug("No se pudo leer el detalle de %s: %s", job.url, exc)
+                log.warning("No se pudo leer el detalle de %s: %s", job.url, exc)
         job.extract_emails()
-        if job_filter.accept(job):
+        reason = job_filter.reject_reason(job)
+        if reason is None:
             accepted.append(job)
-        elif job.enriched:
+            continue
+        key = f"{by_source(job)}: {reason}"
+        reasons[key] = reasons.get(key, 0) + 1
+        if reasons[key] <= 2:  # ejemplos en el log para diagnosticar
+            log.info("Descartada [%s] %s | %s | %s", key, job.title, job.location or "-", job.published or "-")
+        if job.enriched:
             seen.add(job.uid)  # revisada y descartada: no volver a descargarla
 
+    log.info("Descartes: %s", ", ".join(f"{k} = {v}" for k, v in sorted(reasons.items())) or "ninguno")
     log.info("%d vacantes cumplen los filtros (%s)", len(accepted), _count(accepted))
     accepted.sort(key=lambda j: j.score, reverse=True)
     accepted = interleave(accepted, by_source)[: run_cfg.get("max_por_ejecucion", 25)]

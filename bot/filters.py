@@ -54,8 +54,20 @@ class JobFilter:
         job.matched_skills = matched_terms(f"{title} {desc}", self.cv_skills)
         return 3 * len(title_hits) + len(desc_hits) + 2 * len(job.matched_skills)
 
-    def accept(self, job: Job) -> bool:
-        if not (self.title_ok(job) and self.in_antioquia(job) and self.is_recent(job)):
-            return False
+    def reject_reason(self, job: Job):
+        """None si la vacante pasa; si no, el motivo del descarte."""
+        if not self.title_ok(job):
+            return "titulo excluido"
+        if not self.in_antioquia(job):
+            return "fuera de Antioquia"
+        if not self.is_recent(job):
+            return "antigua"
         job.score = self.score(job)
-        return job.score >= self.min_score
+        if job.score == 0:
+            return "no es de sistemas"
+        if job.score < self.min_score:
+            return "puntaje bajo"
+        return None
+
+    def accept(self, job: Job) -> bool:
+        return self.reject_reason(job) is None

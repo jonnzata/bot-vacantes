@@ -1,3 +1,4 @@
+from .email_alerts import EmailAlertSource
 from .html_listing import HtmlListingSource
 from .jooble import JoobleSource
 
@@ -10,6 +11,8 @@ def build_sources(config: dict, http) -> list:
         kind = cfg.get("tipo")
         if kind == "jooble":
             sources.append(JoobleSource(cfg, http))
+        elif kind == "correo":
+            sources.append(EmailAlertSource(cfg))
         elif kind == "html":
             sources.append(HtmlListingSource(cfg, http))
         else:

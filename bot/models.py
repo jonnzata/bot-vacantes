@@ -21,10 +21,11 @@ class Job:
     score: int = 0
     matched_skills: list = field(default_factory=list)
     enriched: bool = False
+    key: str = ""  # identificador propio cuando la URL no sirve (enlaces de rastreo)
 
     @property
     def uid(self) -> str:
-        key = (self.url.split("?")[0].split("#")[0] or self.title).lower()
+        key = (self.key or self.url.split("?")[0].split("#")[0] or self.title).lower()
         return hashlib.sha1(key.encode()).hexdigest()[:16]
 
     def extract_emails(self) -> None:
