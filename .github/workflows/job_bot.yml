@@ -1,0 +1,51 @@
+name: Bot de vacantes
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 minutos (hora UTC)
+  workflow_dispatch:          # botón "Run workflow" para probar a mano
+
+concurrency:
+  group: job-bot
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # Memoria de vacantes ya enviadas (para no repetirlas entre ejecuciones)
+      - name: Restaurar vacantes vistas
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: job-bot-seen-${{ github.run_id }}
+          restore-keys: job-bot-seen-
+
+      - name: Buscar y notificar
+        env:
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+          CV_TEXT: ${{ secrets.CV_TEXT }}
+        run: python -m bot.main
+
+      - name: Guardar vacantes vistas
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: job-bot-seen-${{ github.run_id }}
