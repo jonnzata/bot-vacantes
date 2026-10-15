@@ -133,12 +133,13 @@ fuentes:
     tipo: html
     activa: true
     url: https://www.elempleo.com/co/ofertas-empleo/antioquia/trabajo-{q}
-    enlace_regex: '/co/ofertas-trabajo/[^"?#]+/\d+'
+    enlace_regex: '/co/ofertas-trabajo/[a-z0-9-]+-\d+'
     base: https://www.elempleo.com
 
+  # Desactivada (oct-2026): sus páginas de búsqueda por cargo/ciudad devuelven error 500.
   - nombre: magneto
     tipo: html
-    activa: true
+    activa: false
     url: https://www.magneto365.com/co/trabajos/ofertas-empleo-{q}-en-antioquia
     enlace_regex: '/co/empleos/[^"?#]+'
     base: https://www.magneto365.com
