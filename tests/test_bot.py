@@ -138,3 +138,9 @@ def test_elempleo_regex_matches_real_links():
             'auxiliar-de-sistemas-1886758163"></a>')
     jobs = HtmlListingSource(src, http=None).parse_listing(html)
     assert [j.url for j in jobs] == ["https://www.elempleo.com/co/ofertas-trabajo/auxiliar-de-sistemas-1886758163"]
+
+
+def test_interleave_alternates_sources():
+    from bot.main import interleave
+    jobs = ["a1", "a2", "a3", "b1"]
+    assert interleave(jobs, key=lambda j: j[0]) == ["a1", "b1", "a2", "a3"]

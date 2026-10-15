@@ -40,6 +40,23 @@ def collect(sources, queries, seen) -> list:
     return jobs
 
 
+def interleave(jobs, key) -> list:
+    """Alterna las vacantes por fuente (A1, B1, A2, B2, ...) para que ningún
+    portal acapare los cupos de detalle ni de envío."""
+    groups = {}
+    for job in jobs:
+        groups.setdefault(key(job), []).append(job)
+    result, queues = [], list(groups.values())
+    while queues:
+        result += [q.pop(0) for q in queues]
+        queues = [q for q in queues if q]
+    return result
+
+
+def by_source(job) -> str:
+    return job._source.name
+
+
 def run(config_path: Path, dry_run: bool) -> list:
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     run_cfg = config.get("ejecucion", {})
@@ -54,7 +71,8 @@ def run(config_path: Path, dry_run: bool) -> list:
     sources = build_sources(config, http)
 
     candidates = [j for j in collect(sources, profile.get("busquedas", []), seen) if job_filter.title_ok(j)]
-    log.info("%d vacantes nuevas por revisar", len(candidates))
+    candidates = interleave(candidates, by_source)
+    log.info("%d vacantes nuevas por revisar (%s)", len(candidates), _count(candidates))
 
     accepted, details = [], 0
     for job in candidates:
@@ -70,9 +88,10 @@ def run(config_path: Path, dry_run: bool) -> list:
         elif job.enriched:
             seen.add(job.uid)  # revisada y descartada: no volver a descargarla
 
+    log.info("%d vacantes cumplen los filtros (%s)", len(accepted), _count(accepted))
     accepted.sort(key=lambda j: j.score, reverse=True)
-    accepted = accepted[: run_cfg.get("max_por_ejecucion", 25)]
-    log.info("%d vacantes cumplen los filtros", len(accepted))
+    accepted = interleave(accepted, by_source)[: run_cfg.get("max_por_ejecucion", 25)]
+    log.info("%d vacantes se envían (%s)", len(accepted), _count(accepted))
 
     if dry_run:
         for job in accepted:
@@ -98,6 +117,13 @@ def run(config_path: Path, dry_run: bool) -> list:
             seen.add(job.uid)
     seen.save()
     return accepted
+
+
+def _count(jobs) -> str:
+    counts = {}
+    for job in jobs:
+        counts[by_source(job)] = counts.get(by_source(job), 0) + 1
+    return ", ".join(f"{k}: {v}" for k, v in counts.items()) or "ninguna"
 
 
 def main():
