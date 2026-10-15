@@ -36,8 +36,9 @@ def _location(job: dict) -> str:
             val = addr.get(key)
             if isinstance(val, dict):
                 val = val.get("name")
-            if val and val not in parts:
-                parts.append(str(val))
+            for v in (val if isinstance(val, list) else [val]):  # Magneto usa listas
+                if v and str(v) not in parts:
+                    parts.append(str(v))
     if job.get("jobLocationType") == "TELECOMMUTE":
         parts.append("Remoto")
     return ", ".join(parts)
