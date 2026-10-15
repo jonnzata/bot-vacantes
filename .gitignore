@@ -1,0 +1,6 @@
+__pycache__/
+.pytest_cache/
+data/
+# Tu hoja de vida no se sube al repositorio (usa el secret CV_TEXT en GitHub)
+cv/*
+!cv/.gitkeep

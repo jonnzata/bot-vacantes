@@ -1,0 +1,144 @@
+# Configuración del bot de vacantes.
+# Edita este archivo para ajustar búsquedas, filtros y fuentes.
+
+perfil:
+  # Ruta a tu hoja de vida (PDF o TXT). Opcional: si no existe se usa la
+  # variable de entorno CV_TEXT (útil para no subir tu HV al repositorio).
+  hoja_de_vida: cv/hoja_de_vida.pdf
+
+  # Términos que se buscan en los portales.
+  busquedas:
+    - sistemas
+    - desarrollador
+    - soporte tecnico
+    - redes
+    - infraestructura ti
+    - analista de sistemas
+    - ingeniero de software
+    - cloud
+
+# --- Filtro de ubicación: solo Antioquia ---
+ubicacion:
+  incluir_remoto: false   # true = acepta también vacantes 100% remotas en Colombia
+  municipios:
+    - antioquia
+    - medellin
+    - valle de aburra
+    - envigado
+    - itagui
+    - bello
+    - sabaneta
+    - la estrella
+    - caldas
+    - copacabana
+    - girardota
+    - barbosa
+    - rionegro
+    - marinilla
+    - la ceja
+    - el retiro
+    - guarne
+    - el carmen de viboral
+    - santa fe de antioquia
+    - apartado
+    - turbo
+    - caucasia
+    - puerto berrio
+    - yarumal
+    - andes
+    - jerico
+
+# --- Filtro de área: sistemas / informática ---
+area:
+  # Si alguno aparece en el TÍTULO, la vacante cuenta como de sistemas.
+  # En la descripción se exigen al menos 2 coincidencias.
+  incluir:
+    - sistemas
+    - informatica
+    - software
+    - desarrollador
+    - developer
+    - programador
+    - programacion
+    - soporte tecnico
+    - mesa de ayuda
+    - help desk
+    - redes
+    - telecomunicaciones
+    - infraestructura
+    - cloud
+    - devops
+    - base de datos
+    - bases de datos
+    - dba
+    - ciberseguridad
+    - seguridad informatica
+    - tecnologia de la informacion
+    - area de ti
+    - analista ti
+    - soporte ti
+    - ingeniero de sistemas
+    - tecnologia
+    - tic
+    - full stack
+    - frontend
+    - backend
+    - qa
+    - tester
+    - analista de datos
+    - ingeniero de datos
+    - sysadmin
+    - administrador de servidores
+    - erp
+    - sap
+  # Si alguno aparece en el TÍTULO, la vacante se descarta.
+  excluir:
+    - asesor comercial
+    - vendedor
+    - mercaderista
+    - conductor
+    - auxiliar de bodega
+    - cajero
+    - call center
+
+# --- Ejecución ---
+ejecucion:
+  min_puntaje: 3            # puntaje mínimo para notificar (sube para menos ruido)
+  dias_maximos: 10          # ignora vacantes publicadas hace más de N días (si se conoce la fecha)
+  max_por_ejecucion: 25     # tope de vacantes enviadas por ejecución
+  max_whatsapp: 10          # tope de mensajes de WhatsApp por ejecución
+  max_detalles: 60          # tope de páginas de detalle descargadas por ejecución
+  pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
+
+# --- Fuentes ---
+# jooble: agregador con API gratuita (requiere JOOBLE_API_KEY). Reúne vacantes de
+#         muchos portales colombianos (Computrabajo, elempleo, etc.).
+# html:   scraper genérico. `url` usa {q} (búsqueda) y `enlace_regex` reconoce los
+#         enlaces a ofertas. Si un portal cambia su web, normalmente basta con
+#         ajustar estos dos valores.
+fuentes:
+  - nombre: jooble
+    tipo: jooble
+    activa: true
+    ubicaciones: [Antioquia, Medellín]
+
+  - nombre: computrabajo
+    tipo: html
+    activa: true
+    url: https://co.computrabajo.com/trabajo-de-{q}-en-antioquia
+    enlace_regex: '/ofertas-de-trabajo/oferta-de-trabajo-de-[^"?#]+'
+    base: https://co.computrabajo.com
+
+  - nombre: elempleo
+    tipo: html
+    activa: true
+    url: https://www.elempleo.com/co/ofertas-empleo/antioquia/trabajo-{q}
+    enlace_regex: '/co/ofertas-trabajo/[^"?#]+/\d+'
+    base: https://www.elempleo.com
+
+  - nombre: magneto
+    tipo: html
+    activa: true
+    url: https://www.magneto365.com/co/trabajos/ofertas-empleo-{q}-en-antioquia
+    enlace_regex: '/co/empleos/[^"?#]+'
+    base: https://www.magneto365.com
