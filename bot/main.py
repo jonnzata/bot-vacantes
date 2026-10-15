@@ -1,0 +1,115 @@
+"""Bot de vacantes: busca, filtra (Antioquia + sistemas + tu HV) y notifica.
+
+Uso:
+    python -m bot.main             # ejecución normal
+    python -m bot.main --dry-run   # muestra las vacantes sin enviar ni guardar
+"""
+import argparse
+import logging
+from pathlib import Path
+
+import yaml
+
+from .cv import extract_skills, load_cv_text
+from .filters import JobFilter
+from .http import Http
+from .notify import EmailNotifier, WhatsAppNotifier, job_to_text
+from .sources import build_sources
+from .storage import SeenStore
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+log = logging.getLogger("job_bot")
+
+
+def collect(sources, queries, seen) -> list:
+    """Busca en todas las fuentes y devuelve vacantes nuevas sin duplicados."""
+    jobs, uids = [], set()
+    for source in sources:
+        for q in queries:
+            try:
+                found = source.search(q)
+            except Exception as exc:  # una fuente caída no detiene el bot
+                log.warning("%s falló con %r: %s", source.name, q, exc)
+                break
+            for job in found:
+                if job.uid in seen or job.uid in uids:
+                    continue
+                uids.add(job.uid)
+                job._source = source
+                jobs.append(job)
+    return jobs
+
+
+def run(config_path: Path, dry_run: bool) -> list:
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    run_cfg = config.get("ejecucion", {})
+    profile = config.get("perfil", {})
+
+    skills = extract_skills(load_cv_text(profile.get("hoja_de_vida", ""), BASE_DIR))
+    log.info("Habilidades detectadas en la HV: %s", ", ".join(skills) or "(ninguna)")
+
+    job_filter = JobFilter(config, skills)
+    seen = SeenStore(BASE_DIR / "data" / "seen.json")
+    http = Http(pause=run_cfg.get("pausa_segundos", 1.5))
+    sources = build_sources(config, http)
+
+    candidates = [j for j in collect(sources, profile.get("busquedas", []), seen) if job_filter.title_ok(j)]
+    log.info("%d vacantes nuevas por revisar", len(candidates))
+
+    accepted, details = [], 0
+    for job in candidates:
+        if not job.enriched and details < run_cfg.get("max_detalles", 60):
+            details += 1
+            try:
+                job._source.enrich(job)
+            except Exception as exc:
+                log.debug("No se pudo leer el detalle de %s: %s", job.url, exc)
+        job.extract_emails()
+        if job_filter.accept(job):
+            accepted.append(job)
+        elif job.enriched:
+            seen.add(job.uid)  # revisada y descartada: no volver a descargarla
+
+    accepted.sort(key=lambda j: j.score, reverse=True)
+    accepted = accepted[: run_cfg.get("max_por_ejecucion", 25)]
+    log.info("%d vacantes cumplen los filtros", len(accepted))
+
+    if dry_run:
+        for job in accepted:
+            print(f"\n[{job.score}] " + job_to_text(job))
+        return accepted
+    if not accepted:
+        seen.save()
+        return accepted
+
+    notifiers = [n for n in (EmailNotifier(), WhatsAppNotifier(run_cfg.get("max_whatsapp", 10))) if n.enabled]
+    if not notifiers:
+        log.error("No hay canal configurado (SMTP_* o WHATSAPP_PHONE/CALLMEBOT_APIKEY)")
+        return accepted
+    sent = False
+    for notifier in notifiers:
+        try:
+            notifier.send(accepted)
+            sent = True
+        except Exception as exc:
+            log.error("Falló %s: %s", type(notifier).__name__, exc)
+    if sent:  # solo se marcan como vistas si llegaron por algún canal
+        for job in accepted:
+            seen.add(job.uid)
+    seen.save()
+    return accepted
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default=str(BASE_DIR / "config.yaml"))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s")
+    run(Path(args.config), args.dry_run)
+
+
+if __name__ == "__main__":
+    main()
