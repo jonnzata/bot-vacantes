@@ -1,6 +1,6 @@
 # 🔎 Bot de vacantes: sistemas en Antioquia
 
-Cada 30 minutos, el bot busca vacantes en portales de empleo y te las envía por **correo** y/o **WhatsApp**. Solo envía las que cumplen estas condiciones:
+Cada hora, el bot busca vacantes en portales de empleo y te las envía por **correo** y/o **WhatsApp**. Solo envía las que cumplen estas condiciones:
 
 - La vacante está en **Antioquia** (Medellín, Valle de Aburrá, Oriente, Urabá…).
 - Es del área de **sistemas / informática** (desarrollo, soporte, redes, infraestructura, cloud, datos, QA…).

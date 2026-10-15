@@ -1,10 +1,14 @@
 name: Bot de vacantes
 
+# Se ejecuta CADA HORA. Dos mecanismos, por si uno falla:
+#  1. Cadena: al terminar, el job "programar-siguiente" espera ~1 hora y lanza la
+#     siguiente ejecución. (En repositorios públicos los minutos de Actions son
+#     gratis.) Para arrancar la cadena basta un "Run workflow" manual.
+#  2. Horario de GitHub (cron) como respaldo: si la cadena se corta, la reanuda.
+#     En minuto 17 porque a la hora en punto GitHub se satura y omite ejecuciones.
 on:
   schedule:
-    # Cada 30 min en minutos "raros" (7 y 37): a la hora en punto GitHub se satura
-    # y a veces omite las ejecuciones programadas.
-    - cron: "7,37 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:          # botón "Run workflow" para probar a mano
 
 concurrency:
@@ -51,3 +55,21 @@ jobs:
         with:
           path: data
           key: job-bot-seen-${{ github.run_id }}
+
+  # Espera y lanza la siguiente ejecución. La "concurrency" de arriba garantiza
+  # que nunca corran dos cadenas a la vez (las ejecuciones extra en espera se
+  # cancelan solas).
+  programar-siguiente:
+    needs: buscar
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    permissions:
+      actions: write
+    steps:
+      - name: Esperar hasta la próxima hora
+        run: sleep 3300
+      - name: Lanzar la siguiente ejecución
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run job_bot.yml --repo "${{ github.repository }}" --ref main
