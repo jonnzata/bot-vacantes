@@ -2,7 +2,9 @@ name: Bot de vacantes
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # cada 30 minutos (hora UTC)
+    # Cada 30 min en minutos "raros" (7 y 37): a la hora en punto GitHub se satura
+    # y a veces omite las ejecuciones programadas.
+    - cron: "7,37 * * * *"
   workflow_dispatch:          # botón "Run workflow" para probar a mano
 
 concurrency:
