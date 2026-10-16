@@ -55,7 +55,10 @@ El código debe quedar en la rama principal (`main`), porque GitHub solo ejecuta
 
 - `perfil.busquedas`: los términos que se buscan en los portales.
 - `ubicacion.municipios` / `incluir_remoto`: el filtro de Antioquia.
-- `area.incluir` / `area.excluir`: qué cuenta como vacante de sistemas.
+- `area.incluir`: términos claros de sistemas (cuentan en el título o, al menos 2, en la descripción).
+- `area.incluir_titulo`: términos ambiguos (`sistemas`, `redes`, `infraestructura`...): solo cuentan en el título y, si hay descripción completa, esta debe confirmar que es de sistemas.
+- `area.ignorar`: frases que no son de sistemas ("redes sociales", "sistemas de gestión"...). Si te llega una vacante equivocada, agrega aquí la frase que la coló.
+- `area.excluir`: si aparece en el título, la vacante se descarta (ventas, contable, enfermería...).
 - `ejecucion.min_puntaje`: súbelo si te llegan vacantes poco relevantes.
 - `ejecucion.dias_maximos`, `max_por_ejecucion`, `max_whatsapp`: los límites de cada ejecución.
 

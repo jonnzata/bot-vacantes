@@ -2,9 +2,12 @@ import re
 from datetime import date, timedelta
 
 from .models import Job
-from .text import matched_terms, normalize
+from .text import matched_terms, normalize, remove_terms
 
 REMOTE_TERMS = ["remoto", "teletrabajo", "home office", "trabajo desde casa", "100% remoto"]
+# Desde esta longitud se considera que la vacante trae descripción completa (y no
+# solo la tarjeta de un listado o de un correo de alerta).
+FULL_DESCRIPTION_CHARS = 300
 
 
 class JobFilter:
@@ -12,6 +15,8 @@ class JobFilter:
         self.towns = config["ubicacion"]["municipios"]
         self.allow_remote = config["ubicacion"].get("incluir_remoto", False)
         self.include = config["area"]["incluir"]
+        self.include_title = config["area"].get("incluir_titulo", [])
+        self.ignore = config["area"].get("ignorar", [])
         self.exclude = config["area"].get("excluir", [])
         run = config.get("ejecucion", {})
         self.min_score = run.get("min_puntaje", 3)
@@ -45,14 +50,21 @@ class JobFilter:
         return published >= date.today() - timedelta(days=self.max_days)
 
     def score(self, job: Job) -> int:
-        title = normalize(job.title)
-        desc = normalize(job.description)
+        title = remove_terms(normalize(job.title), self.ignore)
+        desc = remove_terms(normalize(job.description), self.ignore)
         title_hits = matched_terms(title, self.include)
+        weak_hits = matched_terms(title, self.include_title)
         desc_hits = matched_terms(desc, self.include)
-        if not title_hits and len(desc_hits) < 2:
-            return 0  # no es de sistemas
+        if not title_hits:
+            if weak_hits:
+                # Título ambiguo ("Analista de redes", "Ingeniero de infraestructura"):
+                # si hay descripción completa, debe confirmar que es de sistemas.
+                if len(desc) >= FULL_DESCRIPTION_CHARS and not desc_hits:
+                    return 0
+            elif len(desc_hits) < 2:
+                return 0  # no es de sistemas
         job.matched_skills = matched_terms(f"{title} {desc}", self.cv_skills)
-        return 3 * len(title_hits) + len(desc_hits) + 2 * len(job.matched_skills)
+        return 3 * len(title_hits + weak_hits) + len(desc_hits) + 2 * len(job.matched_skills)
 
     def reject_reason(self, job: Job):
         """None si la vacante pasa; si no, el motivo del descarte."""

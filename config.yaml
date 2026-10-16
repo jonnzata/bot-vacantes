@@ -50,56 +50,149 @@ ubicacion:
 
 # --- Filtro de área: sistemas / informática ---
 area:
-  # Si alguno aparece en el TÍTULO, la vacante cuenta como de sistemas.
-  # En la descripción se exigen al menos 2 coincidencias.
+  # Términos claros de sistemas. Si alguno aparece en el TÍTULO, la vacante
+  # cuenta como de sistemas. En la descripción se exigen al menos 2 distintos.
   incluir:
-    - sistemas
     - informatica
     - software
     - desarrollador
     - developer
     - programador
-    - programacion
     - soporte tecnico
+    - soporte ti
+    - soporte a usuarios
     - mesa de ayuda
     - help desk
-    - redes
-    - telecomunicaciones
-    - infraestructura
     - cloud
     - devops
-    - base de datos
-    - bases de datos
     - dba
     - ciberseguridad
     - seguridad informatica
     - tecnologia de la informacion
+    - tecnologias de la informacion
     - area de ti
     - analista ti
-    - soporte ti
     - ingeniero de sistemas
-    - tecnologia
-    - tic
+    - ingenieria de sistemas
+    - tecnico en sistemas
+    - tecnico de sistemas
+    - tecnologo en sistemas
+    - auxiliar de sistemas
+    - analista de sistemas
     - full stack
+    - fullstack
     - frontend
     - backend
-    - qa
     - tester
     - analista de datos
     - ingeniero de datos
     - sysadmin
     - administrador de servidores
+    - servidores
+    - python
+    - java
+    - javascript
+    - sql
+    - linux
+    - aws
+    - azure
+    - docker
+    - kubernetes
+    - active directory
+    - windows server
+    - cableado estructurado
+    - mantenimiento de computadores
+    - mantenimiento de equipos de computo
+
+  # Términos AMBIGUOS ("redes sociales", "sistemas de gestión", "infraestructura
+  # vial", "QA/QC de soldadura"...). Solo cuentan en el TÍTULO, y si la vacante
+  # trae descripción completa, esta debe contener además algún término de `incluir`.
+  incluir_titulo:
+    - sistemas
+    - redes
+    - infraestructura
+    - telecomunicaciones
+    - tecnologia
+    - tic
+    - qa
     - erp
     - sap
+    - base de datos
+    - bases de datos
+    - programacion
+
+  # Frases que NO son de sistemas aunque contengan esas palabras. Se borran del
+  # texto antes de buscar los términos de arriba.
+  ignorar:
+    - sistemas de gestion
+    - sistema de gestion
+    - sistemas integrados
+    - sistema integrado
+    - sistemas de calidad
+    - sistema de calidad
+    - sistemas hidraulicos
+    - sistemas electricos
+    - sistemas de riego
+    - redes sociales
+    - redes electricas
+    - redes de gas
+    - redes hidraulicas
+    - redes hidrosanitarias
+    - redes de acueducto
+    - redes de alcantarillado
+    - redes de distribucion
+    - redes de mercadeo
+    - infraestructura vial
+    - infraestructura fisica
+    - infraestructura civil
+    - obras de infraestructura
+    - tecnologia de alimentos
+    - tecnologia en alimentos
+    - software contable
+    - informatica basica
+    - base de datos de clientes
+    - bases de datos de clientes
+    - programacion de turnos
+    - programacion de produccion
+    - qa/qc
+
   # Si alguno aparece en el TÍTULO, la vacante se descarta.
   excluir:
-    - asesor comercial
+    - comercial
     - vendedor
-    - mercaderista
-    - conductor
-    - auxiliar de bodega
-    - cajero
+    - vendedora
+    - ventas
+    - telemercadeo
+    - teleoperador
     - call center
+    - mercaderista
+    - impulsador
+    - impulsadora
+    - conductor
+    - mensajero
+    - domiciliario
+    - bodega
+    - cajero
+    - cajera
+    - contable
+    - contador
+    - contadora
+    - cartera
+    - enfermeria
+    - enfermero
+    - enfermera
+    - operario
+    - operaria
+    - cocinero
+    - cocinera
+    - mesero
+    - mesera
+    - servicios generales
+    - aseo
+    - vigilante
+    - electricista
+    - ingeniero civil
+    - community manager
 
 # --- Ejecución ---
 ejecucion:

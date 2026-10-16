@@ -188,3 +188,38 @@ def test_indeed_alert_email_uses_job_key():
     assert [j.url for j in jobs] == ["https://co.indeed.com/viewjob?jk=9f8e7d6c5b4a",
                                      "https://co.indeed.com/viewjob?jk=1234abcd"]
     assert jobs[0].uid != jobs[1].uid
+
+
+def _area_job(title, description=""):
+    return Job(title=title, url="u", source="t", location="Medellín, Antioquia", description=description)
+
+
+def test_rejects_non_it_jobs_with_ambiguous_words():
+    flt = make_filter(skills=("excel", "sql", "redes", "sap"))
+    for title, desc in [
+        ("Auxiliar de sistemas de gestión de calidad", "Apoyo al sistema integrado de gestión ISO 9001"),
+        ("Community Manager - Redes sociales", "Gestión de redes sociales"),
+        ("Ingeniero civil de infraestructura vial", "Obras de infraestructura"),
+        ("Asesor de ventas de tecnología", "Venta de celulares"),
+        ("Ejecutivo comercial TIC", "Venta de planes corporativos"),
+        ("Inspector QA/QC soldadura", "Control de calidad en obra"),
+        ("Auxiliar contable SAP", "Manejo de Excel"),
+        ("Profesional en tecnología de alimentos", "Control de calidad en planta"),
+        ("Auxiliar administrativo", "Software contable, informática básica y base de datos de clientes"),
+    ]:
+        assert flt.reject_reason(_area_job(title, desc)) is not None, title
+
+
+def test_ambiguous_title_needs_it_terms_in_full_description():
+    flt = make_filter()
+    relleno = "Responsabilidades del cargo y beneficios de la empresa. " * 8
+    assert flt.accept(_area_job("Ingeniero de infraestructura", relleno + "Servidores Linux y AWS"))
+    assert not flt.accept(_area_job("Ingeniero de infraestructura", relleno + "Obras y redes de acueducto"))
+    # Sin descripción completa (tarjeta de listado o de correo) basta el título.
+    assert flt.accept(_area_job("Analista de redes"))
+
+
+def test_it_terms_in_description_only():
+    flt = make_filter()
+    assert flt.accept(_area_job("Auxiliar III", "Soporte técnico a usuarios, servidores Windows y SQL"))
+    assert not flt.accept(_area_job("Auxiliar III", "Atención al cliente y manejo de software contable"))
