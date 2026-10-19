@@ -420,7 +420,8 @@ fuentes:
     dias: 3                 # revisa los correos de los últimos N días
     remitentes:
       - nombre: linkedin
-        de: [jobalerts-noreply@linkedin.com]   # solo alertas, no confirmaciones
+        # Alertas y "empleos recomendados" (no las confirmaciones de postulación).
+        de: [jobalerts-noreply@linkedin.com, jobs-listings@linkedin.com]
         enlace_regex: 'https?://(?:[a-z]+\.)?linkedin\.com/(?:comm/)?jobs/view/(\d+)'
         url_id: https://www.linkedin.com/jobs/view/{id}/
       - nombre: indeed
