@@ -74,7 +74,7 @@ class EmailNotifier:
 
     def send(self, jobs) -> None:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"🔎 {len(jobs)} vacante(s) de sistemas en Antioquia"
+        msg["Subject"] = f"🔎 {len(jobs)} vacante(s) de sistemas: Antioquia y teletrabajo"
         msg["From"] = self.user
         msg["To"] = self.to
         text = "\n\n".join(job_to_text(j) for j in jobs)

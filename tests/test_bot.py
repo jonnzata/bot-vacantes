@@ -349,3 +349,25 @@ def test_remote_location_noise_and_english_exclusions():
     assert flt.accept(_remote("Desarrollador Backend", "Remoto desde Remoto"))
     assert not flt.accept(_remote("Enterprise Customer Success Manager", "Anywhere"))
     assert not flt.accept(_remote("Product Manager, Platform", "Worldwide"))
+
+
+def test_rejects_apprentices_and_interns():
+    flt = make_filter()
+    for title in ["Aprendiz técnico en sistemas", "Practicante de ingeniería de sistemas",
+                  "Pasante desarrollo de software", "Software Engineering Intern", "Trainee DevOps",
+                  "Aprendiz SENA soporte técnico", "Práctica profesional en sistemas"]:
+        assert not flt.accept(_area_job(title)), title
+    job = _area_job("Auxiliar de sistemas", "Contrato de aprendizaje, etapa productiva. Soporte técnico.")
+    assert flt.reject_reason(job) == "aprendiz o practica"
+    assert flt.accept(_area_job("Internal IT Support Specialist", "Helpdesk, Active Directory"))
+
+
+def test_accepts_all_it_jobs_even_without_cv_matches():
+    flt = make_filter(skills=())
+    relleno = "Responsabilidades del cargo y beneficios de la empresa. " * 8
+    # Título ambiguo confirmado con términos de redes en español
+    assert flt.accept(_area_job("Analista de redes", relleno + "Configuración de switches, routers y firewall Fortinet"))
+    # Sin término en el título: dos términos técnicos en la descripción bastan
+    assert flt.accept(_area_job("Profesional II", "Administración de servidores y bases de datos SQL Server"))
+    assert flt.accept(_area_job("Técnico informático", ""))
+    assert not flt.accept(_area_job("Profesional universitario", relleno + "Servidor público de carrera administrativa"))

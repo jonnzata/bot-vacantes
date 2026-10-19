@@ -4,6 +4,7 @@ Cada hora, el bot busca vacantes en portales de empleo y te las envía por **cor
 
 - La vacante está en **Antioquia** (Medellín, Valle de Aburrá, Oriente, Urabá…) **o es de teletrabajo** y se puede hacer desde Colombia.
 - Es del área de **sistemas / informática** (desarrollo, soporte, redes, infraestructura, cloud, datos, QA…).
+- **No** es para aprendices, practicantes ni pasantes.
 - Se ordena según su **coincidencia con tu hoja de vida**: mientras más habilidades de tu HV aparezcan en la vacante, más arriba sale.
 
 Cada vacante incluye el **enlace para postularte** y, si la oferta lo menciona, el **correo** al que debes enviar la HV.
@@ -65,6 +66,7 @@ El código debe quedar en la rama principal (`main`), porque GitHub solo ejecuta
 - `area.incluir_titulo`: términos ambiguos (`sistemas`, `redes`, `infraestructura`...): solo cuentan en el título y, si hay descripción completa, esta debe confirmar que es de sistemas.
 - `area.ignorar`: frases que no son de sistemas ("redes sociales", "sistemas de gestión"...). Si te llega una vacante equivocada, agrega aquí la frase que la coló.
 - `area.excluir`: si aparece en el título, la vacante se descarta (ventas, contable, enfermería...).
+- `area.excluir_descripcion`: si aparece en la descripción, la vacante se descarta ("contrato de aprendizaje", "etapa productiva"...).
 - `ejecucion.min_puntaje`: súbelo si te llegan vacantes poco relevantes.
 - `ejecucion.dias_maximos`, `max_por_ejecucion`, `max_whatsapp`: los límites de cada ejecución.
 

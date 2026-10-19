@@ -25,6 +25,7 @@ class JobFilter:
         self.include_title = config["area"].get("incluir_titulo", [])
         self.ignore = config["area"].get("ignorar", [])
         self.exclude = config["area"].get("excluir", [])
+        self.exclude_desc = config["area"].get("excluir_descripcion", [])
         run = config.get("ejecucion", {})
         self.min_score = run.get("min_puntaje", 3)
         self.max_days = run.get("dias_maximos", 0)
@@ -89,6 +90,8 @@ class JobFilter:
         """None si la vacante pasa; si no, el motivo del descarte."""
         if not self.title_ok(job):
             return "titulo excluido"
+        if matched_terms(normalize(job.description), self.exclude_desc):
+            return "aprendiz o practica"
         if not self.in_antioquia(job):
             return "fuera de Antioquia y no es remota desde Colombia"
         if not self.is_recent(job):
