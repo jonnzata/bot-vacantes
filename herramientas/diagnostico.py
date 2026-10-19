@@ -96,6 +96,12 @@ def probar_remotos():
             r = flt.reject_reason(j) or "ACEPTADA"
             motivos[r] = motivos.get(r, 0) + 1
         print(f"vacantes={len(jobs)} {motivos}")
+        if cfg["nombre"] == "getonbrd":
+            raw = http.get("https://www.getonbrd.com/api/v0/search/jobs?query=soporte&per_page=8").json()
+            for it in raw.get("data", []):
+                a = it.get("attributes", {})
+                print(f"  raw: remote={a.get('remote')!r} modality={a.get('remote_modality')!r} "
+                      f"countries={a.get('countries')!r} zone={a.get('remote_zone')!r}")
         for j in jobs[:3]:
             print(f"  ej: {j.title[:60]!r} | {j.location[:40]!r} | {j.published} | desc={len(j.description)}")
         for j in [j for j in jobs if flt.accept(j)][:5]:

@@ -268,6 +268,12 @@ area:
     - recruiter
     - copywriter
     - security guard
+    - customer success
+    - customer solution
+    - product manager
+    - product marketing
+    - elearning
+    - art director
     - guarda de seguridad
     - seguridad fisica
     - seguridad y salud
@@ -278,7 +284,7 @@ ejecucion:
   dias_maximos: 10          # ignora vacantes publicadas hace más de N días (si se conoce la fecha)
   max_por_ejecucion: 25     # tope de vacantes enviadas por ejecución
   max_whatsapp: 10          # tope de mensajes de WhatsApp por ejecución
-  max_detalles: 120         # tope de páginas de detalle descargadas por ejecución
+  max_detalles: 150         # tope de páginas de detalle descargadas por ejecución
   pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
 
 # --- Fuentes ---
@@ -343,6 +349,21 @@ fuentes:
         enlace_regex: 'https?://(?:www\.)?magneto365\.com/[^"\s<>]*empleos?/[^"\s<>]+'
 
   # --- Teletrabajo en Colombia (cualquier ciudad) ---
+  # El filtro solo deja las que dicen remoto/teletrabajo y no son híbridas.
+  - nombre: computrabajo_remoto
+    tipo: html
+    activa: true
+    url: https://co.computrabajo.com/trabajo-de-{q}-remoto
+    enlace_regex: '/ofertas-de-trabajo/oferta-de-trabajo-de-[^"?#]+'
+    base: https://co.computrabajo.com
+
+  - nombre: elempleo_remoto
+    tipo: html
+    activa: true
+    url: https://www.elempleo.com/co/ofertas-empleo/trabajo-{q}-remoto
+    enlace_regex: '/co/ofertas-trabajo/[a-z0-9-]+-\d+'
+    base: https://www.elempleo.com
+
   - nombre: jooble_remoto
     tipo: jooble
     activa: true

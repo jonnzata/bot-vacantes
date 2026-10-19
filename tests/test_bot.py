@@ -342,3 +342,10 @@ def test_config_builds_all_sources():
     for n in ("getonbrd", "remotive", "remoteok", "jobicy", "himalayas", "weworkremotely",
               "workingnomads", "jooble_remoto"):
         assert n in names
+
+
+def test_remote_location_noise_and_english_exclusions():
+    flt = make_filter()
+    assert flt.accept(_remote("Desarrollador Backend", "Remoto desde Remoto"))
+    assert not flt.accept(_remote("Enterprise Customer Success Manager", "Anywhere"))
+    assert not flt.accept(_remote("Product Manager, Platform", "Worldwide"))

@@ -9,7 +9,8 @@ REMOTE_TERMS = ["remoto", "remota", "teletrabajo", "home office", "trabajo desde
 # Si el título o la ubicación dicen esto, no es teletrabajo completo.
 NOT_REMOTE_TERMS = ["presencial", "hibrido", "hibrida", "hybrid", "on-site", "onsite"]
 # Palabras que se quitan de la ubicación de una vacante remota antes de ver la región.
-_REMOTE_NOISE = REMOTE_TERMS + ["remoto desde", "only", "solo", "anywhere in the world"]
+_REMOTE_NOISE = sorted(REMOTE_TERMS + ["remoto desde", "remote from", "desde", "from", "only", "solo",
+                                       "anywhere in the world"], key=len, reverse=True)
 # Desde esta longitud se considera que la vacante trae descripción completa (y no
 # solo la tarjeta de un listado o de un correo de alerta).
 FULL_DESCRIPTION_CHARS = 300
