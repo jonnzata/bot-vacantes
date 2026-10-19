@@ -6,6 +6,7 @@ Uso:
 """
 import argparse
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -21,16 +22,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 log = logging.getLogger("job_bot")
 
 
+def is_due(source, seen) -> bool:
+    """Las fuentes con `cada_horas` solo se consultan cada tantas horas."""
+    hours = getattr(source, "interval_hours", 0)
+    last = seen.last_run(source.name)
+    return not (hours and last and datetime.now(timezone.utc) - last < timedelta(hours=hours) - timedelta(minutes=10))
+
+
 def collect(sources, queries, seen) -> list:
     """Busca en todas las fuentes y devuelve vacantes nuevas sin duplicados."""
     jobs, uids = [], set()
     for source in sources:
+        if not is_due(source, seen):
+            log.info("%s: se omite en esta ejecución (se consulta cada %s h)", source.name, source.interval_hours)
+            continue
         for q in queries:
             try:
                 found = source.search(q)
             except Exception as exc:  # una fuente caída no detiene el bot
                 log.warning("%s falló con %r: %s", source.name, q, exc)
                 break
+            if getattr(source, "interval_hours", 0):
+                seen.mark_run(source.name)
             for job in found:
                 if job.uid in seen or job.uid in uids:
                     continue

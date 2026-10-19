@@ -1,6 +1,7 @@
 from .email_alerts import EmailAlertSource
 from .html_listing import HtmlListingSource
 from .jooble import JoobleSource
+from .remote_apis import RemoteApiSource
 
 
 def build_sources(config: dict, http) -> list:
@@ -15,6 +16,8 @@ def build_sources(config: dict, http) -> list:
             sources.append(EmailAlertSource(cfg))
         elif kind == "html":
             sources.append(HtmlListingSource(cfg, http))
+        elif kind == "remoto":
+            sources.append(RemoteApiSource(cfg, http))
         else:
             raise ValueError(f"Tipo de fuente desconocido: {kind!r}")
     return sources

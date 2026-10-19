@@ -16,10 +16,33 @@ perfil:
     - analista de sistemas
     - ingeniero de software
     - cloud
+    - ciberseguridad
+    - seguridad informatica
+    - mesa de ayuda
+    - devops
 
-# --- Filtro de ubicación: solo Antioquia ---
+# --- Filtro de ubicación: Antioquia o teletrabajo ---
 ubicacion:
-  incluir_remoto: false   # true = acepta también vacantes 100% remotas en Colombia
+  # true = acepta también vacantes de teletrabajo de otras ciudades o países,
+  # siempre que se puedan hacer desde Colombia (ver regiones_remoto).
+  incluir_remoto: true
+  # Las vacantes de portales remotos internacionales suelen limitar desde dónde
+  # se puede trabajar ("USA only", "Europe"...). Solo se aceptan las que no
+  # ponen límite o las que incluyen alguna de estas regiones.
+  regiones_remoto:
+    - colombia
+    - latam
+    - latin america
+    - latinoamerica
+    - america latina
+    - south america
+    - sudamerica
+    - americas
+    - worldwide
+    - anywhere
+    - global
+    - world
+    - cualquier lugar
   municipios:
     - antioquia
     - medellin
@@ -103,6 +126,44 @@ area:
     - cableado estructurado
     - mantenimiento de computadores
     - mantenimiento de equipos de computo
+    # Ciberseguridad
+    - analista soc
+    - soc analyst
+    - analista de seguridad
+    - security analyst
+    - security engineer
+    - cybersecurity
+    - cyber security
+    - information security
+    - infosec
+    - pentester
+    - pentesting
+    - penetration testing
+    - hacking etico
+    - ethical hacking
+    - siem
+    - red team
+    - blue team
+    # Soporte técnico, redes e infraestructura (también en inglés: portales remotos)
+    - technical support
+    - tech support
+    - it support
+    - helpdesk
+    - service desk
+    - desktop support
+    - support engineer
+    - ingeniero de redes
+    - administrador de redes
+    - network engineer
+    - network administrator
+    - systems administrator
+    - system administrator
+    - site reliability
+    - sre
+    - cloud engineer
+    - data engineer
+    - software engineer
+    - programmer
 
   # Términos AMBIGUOS ("redes sociales", "sistemas de gestión", "infraestructura
   # vial", "QA/QC de soldadura"...). Solo cuentan en el TÍTULO, y si la vacante
@@ -120,6 +181,13 @@ area:
     - base de datos
     - bases de datos
     - programacion
+    - network
+    - networking
+    - security
+    - seguridad
+    - infrastructure
+    - systems
+    - technology
 
   # Frases que NO son de sistemas aunque contengan esas palabras. Se borran del
   # texto antes de buscar los términos de arriba.
@@ -193,6 +261,16 @@ area:
     - electricista
     - ingeniero civil
     - community manager
+    - sales
+    - account executive
+    - account manager
+    - marketing
+    - recruiter
+    - copywriter
+    - security guard
+    - guarda de seguridad
+    - seguridad fisica
+    - seguridad y salud
 
 # --- Ejecución ---
 ejecucion:
@@ -204,6 +282,8 @@ ejecucion:
   pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
 
 # --- Fuentes ---
+# remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se
+#         consultan con `cada_horas` para respetar sus límites de uso.
 # jooble: agregador con API gratuita (requiere JOOBLE_API_KEY). Reúne vacantes de
 #         muchos portales colombianos (Computrabajo, elempleo, etc.).
 # html:   scraper genérico. `url` usa {q} (búsqueda) y `enlace_regex` reconoce los
@@ -261,3 +341,40 @@ fuentes:
       - nombre: magneto
         de: magneto365.com
         enlace_regex: 'https?://(?:www\.)?magneto365\.com/[^"\s<>]*empleos?/[^"\s<>]+'
+
+  # --- Teletrabajo en Colombia (cualquier ciudad) ---
+  - nombre: jooble_remoto
+    tipo: jooble
+    activa: true
+    ubicaciones: [Colombia]
+    sufijo: remoto           # busca "sistemas remoto", "redes remoto"...
+
+  # --- Portales de teletrabajo (LatAm e internacionales) ---
+  - nombre: getonbrd         # LatAm, en español, muy fuerte en TI
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: remotive
+    tipo: remoto
+    activa: true
+    cada_horas: 8            # piden no consultar más de ~4 veces al día
+  - nombre: remoteok
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: jobicy           # solo vacantes abiertas a LATAM
+    tipo: remoto
+    activa: true
+    cada_horas: 6
+  - nombre: himalayas
+    tipo: remoto
+    activa: true
+    cada_horas: 6
+  - nombre: weworkremotely   # RSS: sysadmin/devops, soporte y programación
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: workingnomads
+    tipo: remoto
+    activa: true
+    cada_horas: 6

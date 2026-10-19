@@ -21,6 +21,14 @@ class SeenStore:
     def add(self, uid: str) -> None:
         self.data[uid] = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+    # Última consulta de cada fuente (para las que piden no consultarlas cada hora).
+    def last_run(self, source: str):
+        value = self.data.get(f"fuente:{source}")
+        return datetime.fromisoformat(value) if value else None
+
+    def mark_run(self, source: str) -> None:
+        self.add(f"fuente:{source}")
+
     def save(self) -> None:
         limit = datetime.now(timezone.utc) - timedelta(days=self.keep_days)
         self.data = {k: v for k, v in self.data.items() if datetime.fromisoformat(v) >= limit}

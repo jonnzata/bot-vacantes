@@ -21,6 +21,7 @@ class Job:
     score: int = 0
     matched_skills: list = field(default_factory=list)
     enriched: bool = False
+    remote: bool = False  # la fuente garantiza que es teletrabajo
     key: str = ""  # identificador propio cuando la URL no sirve (enlaces de rastreo)
 
     @property

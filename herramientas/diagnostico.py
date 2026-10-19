@@ -29,12 +29,26 @@ URLS = [
         "https://www.elempleo.com/co/ofertas-empleo/?trabajo=sistemas&ciudad=medellin",
         "https://www.elempleo.com/co/ofertas-empleo/?Trabajo=sistemas&Ciudad=Medellin",
     ]),
+    ("computrabajo remoto", r"/ofertas-de-trabajo/oferta-de-trabajo-de-[^\"?#]+", [
+        "https://co.computrabajo.com/trabajo-de-sistemas-remoto",
+        "https://co.computrabajo.com/trabajo-de-sistemas?mod=2",
+        "https://co.computrabajo.com/trabajo-de-sistemas-en-remoto",
+        "https://co.computrabajo.com/trabajo-de-sistemas-teletrabajo",
+        "https://co.computrabajo.com/trabajo-de-teletrabajo-sistemas",
+    ]),
+    ("elempleo remoto", r"/co/ofertas-trabajo/[a-z0-9-]+-\d+", [
+        "https://www.elempleo.com/co/ofertas-empleo/trabajo-sistemas-remoto",
+        "https://www.elempleo.com/co/ofertas-empleo/teletrabajo/trabajo-sistemas",
+        "https://www.elempleo.com/co/ofertas-empleo/trabajo-sistemas?modalidad=teletrabajo",
+    ]),
     ("magneto", r"/co/empleos/[^\"?#]+", [
         "https://www.magneto365.com/co/trabajos/ofertas-empleo-sistemas-en-antioquia",
         "https://www.magneto365.com/co/trabajos/ofertas-empleo-en-medellin",
         "https://www.magneto365.com/co/trabajos/ofertas-empleo-sistemas",
         "https://www.magneto365.com/co/empleos",
         "https://www.magneto365.com/co/empleos?q=sistemas",
+        "https://www.magneto365.com/co/trabajos/ofertas-empleo-remoto",
+        "https://www.magneto365.com/co/trabajos/ofertas-empleo-teletrabajo",
     ]),
 ]
 
@@ -56,6 +70,36 @@ def probar_urls():
             bog = texto.count("bogot")
             print(f"{r.status_code}  {url}\n     ofertas={len(enlaces)} antioquia/medellin={ant} bogota={bog} "
                   f"jsonld={'JobPosting' in html} ejemplo={enlaces[:3]}")
+
+
+def probar_remotos():
+    """Consulta cada portal de teletrabajo una vez y muestra cuántas vacantes
+    pasarían los filtros (con ejemplos de título y región)."""
+    import yaml
+    from bot.filters import JobFilter
+    from bot.sources.remote_apis import RemoteApiSource
+
+    config = yaml.safe_load((Path(__file__).resolve().parent.parent / "config.yaml").read_text(encoding="utf-8"))
+    flt = JobFilter(config, [])
+    http = Http(pause=1.0)
+    for cfg in config["fuentes"]:
+        if cfg.get("tipo") != "remoto":
+            continue
+        print(f"\n=== {cfg['nombre']} ===")
+        try:
+            jobs = RemoteApiSource(cfg, http).search("soporte")
+        except Exception as exc:
+            print(f"ERR  {exc!r}")
+            continue
+        motivos = {}
+        for j in jobs:
+            r = flt.reject_reason(j) or "ACEPTADA"
+            motivos[r] = motivos.get(r, 0) + 1
+        print(f"vacantes={len(jobs)} {motivos}")
+        for j in jobs[:3]:
+            print(f"  ej: {j.title[:60]!r} | {j.location[:40]!r} | {j.published} | desc={len(j.description)}")
+        for j in [j for j in jobs if flt.accept(j)][:5]:
+            print(f"  OK: {j.title[:60]!r} | {j.location[:40]!r} | {j.url[:70]}")
 
 
 def resumir_correos():
@@ -99,5 +143,6 @@ def resumir_correos():
 
 
 if __name__ == "__main__":
+    probar_remotos()
     probar_urls()
     resumir_correos()

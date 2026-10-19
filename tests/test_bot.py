@@ -223,3 +223,122 @@ def test_it_terms_in_description_only():
     flt = make_filter()
     assert flt.accept(_area_job("Auxiliar III", "Soporte técnico a usuarios, servidores Windows y SQL"))
     assert not flt.accept(_area_job("Auxiliar III", "Atención al cliente y manejo de software contable"))
+
+
+# --- Teletrabajo -----------------------------------------------------------------
+from bot.sources import remote_apis  # noqa: E402
+
+LARGA = "Join our team. We use Linux, AWS, Docker and Python every day. " * 6
+
+
+def test_remote_api_parsers():
+    jobs = remote_apis.parse_remotive({"jobs": [{
+        "title": "Senior DevOps Engineer", "url": "https://remotive.com/1", "company_name": "ACME",
+        "candidate_required_location": "LATAM", "description": "<p>Kubernetes</p>",
+        "publication_date": "2026-10-15T10:00:00"}]})
+    assert (jobs[0].title, jobs[0].location, jobs[0].published, jobs[0].remote) == (
+        "Senior DevOps Engineer", "LATAM", "2026-10-15", True)
+
+    jobs = remote_apis.parse_remoteok([{"legal": "aviso"}, {
+        "position": "IT Support Specialist", "url": "https://remoteok.com/2", "company": "Foo",
+        "location": "Worldwide", "description": "Helpdesk", "tags": ["support"], "date": "2026-10-14T00:00:00+00:00"}])
+    assert [j.title for j in jobs] == ["IT Support Specialist"] and "support" in jobs[0].description
+
+    jobs = remote_apis.parse_jobicy({"jobs": [{"jobTitle": "SOC Analyst", "url": "u", "companyName": "Sec",
+                                               "jobGeo": "LATAM", "jobDescription": "SIEM",
+                                               "pubDate": "2026-10-13 08:00:00"}]})
+    assert jobs[0].published == "2026-10-13"
+
+    jobs = remote_apis.parse_himalayas({"jobs": [{"title": "Cloud Engineer", "applicationLink": "u",
+                                                  "locationRestrictions": ["Colombia", "Mexico"],
+                                                  "description": "AWS", "pubDate": 1760400000}]})
+    assert jobs[0].location == "Colombia, Mexico" and jobs[0].published.startswith("2025")
+
+    rss = """<rss><channel><item><title>ACME: Linux Systems Administrator</title>
+      <region>Anywhere in the World</region><link>https://weworkremotely.com/x</link>
+      <pubDate>Tue, 14 Oct 2026 10:00:00 +0000</pubDate><description>&lt;p&gt;Linux&lt;/p&gt;</description>
+      </item></channel></rss>"""
+    job = remote_apis.parse_rss(rss)[0]
+    assert (job.company, job.title, job.published) == ("ACME", "Linux Systems Administrator", "2026-10-14")
+
+
+def test_getonbrd_modalities():
+    def item(modality, countries):
+        return {"id": "dev-1", "attributes": {"title": "Desarrollador Backend", "remote_modality": modality,
+                                              "countries": countries, "description": "Python",
+                                              "published_at": 1760400000},
+                "links": {"public_url": "https://www.getonbrd.com/jobs/dev-1"}}
+    jobs = remote_apis.parse_getonbrd({"data": [item("fully_remote", ["Chile"]),
+                                                item("remote_local", ["Chile"]),
+                                                item("remote_local", ["Colombia", "Peru"]),
+                                                item("hybrid", ["Colombia"])]})
+    flt = make_filter()
+    assert [flt.remote_ok(j) for j in jobs] == [True, False, True, False]
+    assert jobs[0].url == "https://www.getonbrd.com/jobs/dev-1"
+
+
+def _remote(title, location, description=LARGA):
+    job = Job(title=title, url="u", source="t", location=location, description=description)
+    job.remote = True
+    return job
+
+
+def test_remote_jobs_must_be_open_to_colombia():
+    flt = make_filter()
+    assert flt.accept(_remote("Site Reliability Engineer", "Worldwide"))
+    assert flt.accept(_remote("Security Engineer", "LATAM"))
+    assert flt.accept(_remote("IT Support Specialist", ""))
+    assert flt.accept(_remote("Cybersecurity Analyst", "USA, Colombia, Mexico"))
+    assert not flt.accept(_remote("Network Engineer", "USA only"))
+    assert not flt.accept(_remote("DevOps Engineer", "Europe"))
+    assert not flt.accept(_remote("Software Engineer (Hybrid)", "Worldwide"))
+    assert not flt.accept(_remote("Sales Development Representative", "Worldwide"))
+    assert not flt.accept(_remote("Security Guard", "Worldwide"))
+
+
+def test_remote_from_colombian_portals():
+    flt = make_filter()
+    tele = Job(title="Analista de ciberseguridad", url="u", source="t", location="Bogotá, D.C.",
+               description="Modalidad teletrabajo. SIEM y pentesting.")
+    hibrido = Job(title="Analista de ciberseguridad", url="u", source="t", location="Bogotá, D.C.",
+                  description="Modalidad híbrida, 3 días remoto.")
+    presencial = Job(title="Soporte técnico", url="u", source="t", location="Cali, Valle")
+    assert flt.accept(tele)
+    assert not flt.accept(hibrido)
+    assert not flt.accept(presencial)
+
+
+def test_jsonld_telecommute_marks_location():
+    data = {"@type": "JobPosting", "title": "Soporte TI", "jobLocationType": "TELECOMMUTE",
+            "jobLocation": {"address": {"addressLocality": "Bogotá"}}, "description": "Mesa de ayuda"}
+    parsed = parse_job_posting(f'<script type="application/ld+json">{json.dumps(data)}</script>')
+    assert parsed["location"] == "Bogotá, Remoto"
+    job = Job(title=parsed["title"], url="u", source="t", location=parsed["location"],
+              description=parsed["description"])
+    assert make_filter().accept(job)
+
+
+def test_sources_with_interval_are_not_queried_every_hour(tmp_path):
+    from bot.main import collect
+    from bot.storage import SeenStore
+
+    class Fake:
+        name, interval_hours, calls = "fake", 6, 0
+
+        def search(self, q):
+            Fake.calls += 1
+            return [Job(title="Desarrollador", url=f"https://x/{Fake.calls}", source="fake")]
+
+    seen = SeenStore(tmp_path / "seen.json")
+    assert len(collect([Fake()], ["sistemas"], seen)) == 1
+    seen.save()
+    again = SeenStore(tmp_path / "seen.json")
+    assert collect([Fake()], ["sistemas"], again) == [] and Fake.calls == 1
+
+
+def test_config_builds_all_sources():
+    from bot.sources import build_sources
+    names = [s.name for s in build_sources(CONFIG, http=None)]
+    for n in ("getonbrd", "remotive", "remoteok", "jobicy", "himalayas", "weworkremotely",
+              "workingnomads", "jooble_remoto"):
+        assert n in names

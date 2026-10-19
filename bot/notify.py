@@ -18,6 +18,8 @@ def job_to_text(job) -> str:
         lines.append(f"🏢 {job.company}")
     if job.location:
         lines.append(f"📍 {job.location}")
+    if job.remote:
+        lines.append("🏠 Teletrabajo")
     if job.published:
         lines.append(f"📅 {job.published}")
     if job.matched_skills:
@@ -36,6 +38,8 @@ def job_to_html(job) -> str:
         rows.append(f"🏢 {e(job.company)}")
     if job.location:
         rows.append(f"📍 {e(job.location)}")
+    if job.remote:
+        rows.append("🏠 Teletrabajo")
     if job.published:
         rows.append(f"📅 Publicada: {e(job.published)}")
     if job.matched_skills:

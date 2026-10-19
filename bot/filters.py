@@ -4,7 +4,12 @@ from datetime import date, timedelta
 from .models import Job
 from .text import matched_terms, normalize, remove_terms
 
-REMOTE_TERMS = ["remoto", "teletrabajo", "home office", "trabajo desde casa", "100% remoto"]
+REMOTE_TERMS = ["remoto", "remota", "teletrabajo", "home office", "trabajo desde casa", "100% remoto",
+                "remote", "fully remote", "work from home"]
+# Si el título o la ubicación dicen esto, no es teletrabajo completo.
+NOT_REMOTE_TERMS = ["presencial", "hibrido", "hibrida", "hybrid", "on-site", "onsite"]
+# Palabras que se quitan de la ubicación de una vacante remota antes de ver la región.
+_REMOTE_NOISE = REMOTE_TERMS + ["remoto desde", "only", "solo", "anywhere in the world"]
 # Desde esta longitud se considera que la vacante trae descripción completa (y no
 # solo la tarjeta de un listado o de un correo de alerta).
 FULL_DESCRIPTION_CHARS = 300
@@ -14,6 +19,7 @@ class JobFilter:
     def __init__(self, config: dict, cv_skills: list):
         self.towns = config["ubicacion"]["municipios"]
         self.allow_remote = config["ubicacion"].get("incluir_remoto", False)
+        self.remote_regions = config["ubicacion"].get("regiones_remoto", ["colombia"])
         self.include = config["area"]["incluir"]
         self.include_title = config["area"].get("incluir_titulo", [])
         self.ignore = config["area"].get("ignorar", [])
@@ -32,9 +38,21 @@ class JobFilter:
         where = normalize(job.location) or normalize(job.description[:600])
         if matched_terms(where, self.towns):
             return True
-        if self.allow_remote:
-            return bool(matched_terms(normalize(f"{job.title} {job.location}"), REMOTE_TERMS))
-        return False
+        return self.allow_remote and self.remote_ok(job)
+
+    def remote_ok(self, job: Job) -> bool:
+        """Teletrabajo que se puede hacer desde Colombia."""
+        head = normalize(f"{job.title} {job.location}")
+        if matched_terms(head, NOT_REMOTE_TERMS):
+            return False
+        if job.remote:
+            # Portal de teletrabajo (a menudo internacional): la región que exige la
+            # vacante debe estar vacía o ser global / LatAm / Colombia.
+            region = re.sub(r"[^a-z]+", " ", remove_terms(normalize(job.location), _REMOTE_NOISE)).strip()
+            return not region or bool(matched_terms(region, self.remote_regions))
+        # Portales colombianos: basta con que diga remoto y no sea híbrido/presencial.
+        text = normalize(job.description[:600])
+        return bool(matched_terms(f"{head} {text}", REMOTE_TERMS)) and not matched_terms(text, NOT_REMOTE_TERMS)
 
     def is_recent(self, job: Job) -> bool:
         if not self.max_days or not job.published:
@@ -71,7 +89,7 @@ class JobFilter:
         if not self.title_ok(job):
             return "titulo excluido"
         if not self.in_antioquia(job):
-            return "fuera de Antioquia"
+            return "fuera de Antioquia y no es remota desde Colombia"
         if not self.is_recent(job):
             return "antigua"
         job.score = self.score(job)
