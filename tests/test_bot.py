@@ -371,3 +371,18 @@ def test_accepts_all_it_jobs_even_without_cv_matches():
     assert flt.accept(_area_job("Profesional II", "Administración de servidores y bases de datos SQL Server"))
     assert flt.accept(_area_job("Técnico informático", ""))
     assert not flt.accept(_area_job("Profesional universitario", relleno + "Servidor público de carrera administrativa"))
+
+
+def test_linkedin_mailbox_is_optional(monkeypatch):
+    from bot.sources.email_alerts import EmailAlertSource
+    cfg = next(f for f in CONFIG["fuentes"] if f["nombre"] == "alertas_linkedin")
+    monkeypatch.delenv("LINKEDIN_IMAP_USER", raising=False)
+    monkeypatch.setenv("SMTP_USER", "bot@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    assert EmailAlertSource(cfg).search("sistemas") == []  # sin secrets: se omite, no falla
+    monkeypatch.setenv("LINKEDIN_IMAP_USER", "otro@gmail.com")
+    monkeypatch.setenv("LINKEDIN_IMAP_PASSWORD", "y")
+    src = EmailAlertSource(cfg)
+    assert (src.user, src.password) == ("otro@gmail.com", "y")
+    jobs = src.parse_alert(LINKEDIN_ALERT, src.senders[0])
+    assert jobs[0].url == "https://www.linkedin.com/jobs/view/4011223344/"

@@ -47,6 +47,8 @@ jobs:
           WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
           CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
           CV_TEXT: ${{ secrets.CV_TEXT }}
+          LINKEDIN_IMAP_USER: ${{ secrets.LINKEDIN_IMAP_USER }}
+          LINKEDIN_IMAP_PASSWORD: ${{ secrets.LINKEDIN_IMAP_PASSWORD }}
         run: python -m bot.main
 
       - name: Guardar vacantes vistas

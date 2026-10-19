@@ -17,4 +17,6 @@ jobs:
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          LINKEDIN_IMAP_USER: ${{ secrets.LINKEDIN_IMAP_USER }}
+          LINKEDIN_IMAP_PASSWORD: ${{ secrets.LINKEDIN_IMAP_PASSWORD }}
         run: python herramientas/diagnostico.py

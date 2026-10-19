@@ -434,6 +434,21 @@ fuentes:
         de: magneto365.com
         enlace_regex: 'https?://(?:www\.)?magneto365\.com/[^"\s<>]*empleos?/[^"\s<>]+'
 
+  # Alertas de LinkedIn que llegan a OTRO Gmail (el de tu cuenta de LinkedIn).
+  # Secrets: LINKEDIN_IMAP_USER (ese Gmail) y LINKEDIN_IMAP_PASSWORD (su
+  # contraseña de aplicación). Sin ellos, esta fuente se omite.
+  - nombre: alertas_linkedin
+    tipo: correo
+    activa: true
+    dias: 3
+    usuario_env: LINKEDIN_IMAP_USER
+    clave_env: LINKEDIN_IMAP_PASSWORD
+    remitentes:
+      - nombre: linkedin
+        de: [jobalerts-noreply@linkedin.com, jobs-listings@linkedin.com]
+        enlace_regex: 'https?://(?:[a-z]+\.)?linkedin\.com/(?:comm/)?jobs/view/(\d+)'
+        url_id: https://www.linkedin.com/jobs/view/{id}/
+
   # --- Teletrabajo en Colombia (cualquier ciudad) ---
   # El filtro solo deja las que dicen remoto/teletrabajo y no son híbridas.
   - nombre: computrabajo_remoto

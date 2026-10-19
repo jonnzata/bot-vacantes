@@ -51,6 +51,8 @@ Ve a *Settings → Secrets and variables → Actions → New repository secret*:
 | `CALLMEBOT_APIKEY` | la clave que te dio CallMeBot |
 | `JOOBLE_API_KEY` | la clave de Jooble |
 | `CV_TEXT` | **el texto de tu hoja de vida**: copia el contenido de tu HV y pégalo aquí |
+| `LINKEDIN_IMAP_USER` | opcional: el Gmail de tu cuenta de LinkedIn, si es distinto de `SMTP_USER` |
+| `LINKEDIN_IMAP_PASSWORD` | la contraseña de aplicación de ese Gmail |
 
 Puedes configurar solo el correo, solo WhatsApp o los dos.
 

@@ -151,10 +151,17 @@ def resumir_correos():
 def remitentes_linkedin():
     """Cuenta los correos de LinkedIn de los últimos 60 días por dirección de
     remitente (sin mostrar contenido), en la bandeja y en 'Todos'."""
-    user = os.environ.get("SMTP_USER")
-    pwd = os.environ.get("SMTP_PASSWORD")
-    if not (user and pwd):
-        return
+    buzones = [("bot", os.environ.get("SMTP_USER"), os.environ.get("SMTP_PASSWORD")),
+               ("linkedin", os.environ.get("LINKEDIN_IMAP_USER"), os.environ.get("LINKEDIN_IMAP_PASSWORD"))]
+    for nombre, user, pwd in buzones:
+        if not (user and pwd):
+            print(f"\n(buzón {nombre}: sin credenciales)")
+            continue
+        print(f"\n##### buzón {nombre} #####")
+        _contar_linkedin(user, pwd)
+
+
+def _contar_linkedin(user, pwd):
     from datetime import date, timedelta
     since = (date.today() - timedelta(days=60)).strftime("%d-%b-%Y")
     with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
