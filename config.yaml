@@ -16,10 +16,43 @@ perfil:
     - analista de sistemas
     - ingeniero de software
     - cloud
+    - ciberseguridad
+    - seguridad informatica
+    - mesa de ayuda
+    - devops
+    - ingeniero de sistemas
+    - tecnico en sistemas
+    - auxiliar de sistemas
+    - programador
+    - analista de soporte
+    - administrador de redes
+    - telecomunicaciones
+    - base de datos
+    - analista de datos
+    - qa tester
 
-# --- Filtro de ubicación: solo Antioquia ---
+# --- Filtro de ubicación: Antioquia o teletrabajo ---
 ubicacion:
-  incluir_remoto: false   # true = acepta también vacantes 100% remotas en Colombia
+  # true = acepta también vacantes de teletrabajo de otras ciudades o países,
+  # siempre que se puedan hacer desde Colombia (ver regiones_remoto).
+  incluir_remoto: true
+  # Las vacantes de portales remotos internacionales suelen limitar desde dónde
+  # se puede trabajar ("USA only", "Europe"...). Solo se aceptan las que no
+  # ponen límite o las que incluyen alguna de estas regiones.
+  regiones_remoto:
+    - colombia
+    - latam
+    - latin america
+    - latinoamerica
+    - america latina
+    - south america
+    - sudamerica
+    - americas
+    - worldwide
+    - anywhere
+    - global
+    - world
+    - cualquier lugar
   municipios:
     - antioquia
     - medellin
@@ -50,67 +83,298 @@ ubicacion:
 
 # --- Filtro de área: sistemas / informática ---
 area:
-  # Si alguno aparece en el TÍTULO, la vacante cuenta como de sistemas.
-  # En la descripción se exigen al menos 2 coincidencias.
+  # Términos claros de sistemas. Si alguno aparece en el TÍTULO, la vacante
+  # cuenta como de sistemas. En la descripción se exigen al menos 2 distintos.
   incluir:
-    - sistemas
     - informatica
     - software
     - desarrollador
     - developer
     - programador
-    - programacion
     - soporte tecnico
+    - soporte ti
+    - soporte a usuarios
     - mesa de ayuda
     - help desk
-    - redes
-    - telecomunicaciones
-    - infraestructura
     - cloud
     - devops
-    - base de datos
-    - bases de datos
     - dba
     - ciberseguridad
     - seguridad informatica
     - tecnologia de la informacion
+    - tecnologias de la informacion
     - area de ti
     - analista ti
-    - soporte ti
     - ingeniero de sistemas
-    - tecnologia
-    - tic
+    - ingenieria de sistemas
+    - tecnico en sistemas
+    - tecnico de sistemas
+    - tecnologo en sistemas
+    - auxiliar de sistemas
+    - analista de sistemas
     - full stack
+    - fullstack
     - frontend
     - backend
-    - qa
     - tester
     - analista de datos
     - ingeniero de datos
     - sysadmin
     - administrador de servidores
+    - servidores
+    - python
+    - java
+    - javascript
+    - sql
+    - linux
+    - aws
+    - azure
+    - docker
+    - kubernetes
+    - active directory
+    - windows server
+    - cableado estructurado
+    - mantenimiento de computadores
+    - mantenimiento de equipos de computo
+    - informatico
+    - desarrolladora
+    - programadora
+    - desarrollo de software
+    - ingeniera de sistemas
+    - ingeniero de software
+    - ingeniera de software
+    - tecnologa en sistemas
+    - analista de soporte
+    - tecnico de soporte
+    - tecnico en soporte
+    - ingeniero de soporte
+    - seguridad de la informacion
+    - auditoria de sistemas
+    - servidor
+    - switches
+    - router
+    - routers
+    - firewall
+    - cisco
+    - ccna
+    - fortinet
+    - mikrotik
+    - vpn
+    - tcp/ip
+    - vmware
+    - virtualizacion
+    - hardware
+    - sistemas operativos
+    - office 365
+    - microsoft 365
+    - sql server
+    - mysql
+    - postgresql
+    - oracle
+    - php
+    - .net
+    - c#
+    - react
+    - angular
+    - node
+    - git
+    - itil
+    # Ciberseguridad
+    - analista soc
+    - soc analyst
+    - analista de seguridad
+    - security analyst
+    - security engineer
+    - cybersecurity
+    - cyber security
+    - information security
+    - infosec
+    - pentester
+    - pentesting
+    - penetration testing
+    - hacking etico
+    - ethical hacking
+    - siem
+    - red team
+    - blue team
+    # Soporte técnico, redes e infraestructura (también en inglés: portales remotos)
+    - technical support
+    - tech support
+    - it support
+    - helpdesk
+    - service desk
+    - desktop support
+    - support engineer
+    - ingeniero de redes
+    - administrador de redes
+    - network engineer
+    - network administrator
+    - systems administrator
+    - system administrator
+    - site reliability
+    - sre
+    - cloud engineer
+    - data engineer
+    - software engineer
+    - programmer
+
+  # Términos AMBIGUOS ("redes sociales", "sistemas de gestión", "infraestructura
+  # vial", "QA/QC de soldadura"...). Solo cuentan en el TÍTULO, y si la vacante
+  # trae descripción completa, esta debe contener además algún término de `incluir`.
+  incluir_titulo:
+    - sistemas
+    - redes
+    - infraestructura
+    - telecomunicaciones
+    - tecnologia
+    - tic
+    - qa
     - erp
     - sap
+    - base de datos
+    - bases de datos
+    - programacion
+    - network
+    - networking
+    - security
+    - seguridad
+    - infrastructure
+    - systems
+    - technology
+
+  # Frases que NO son de sistemas aunque contengan esas palabras. Se borran del
+  # texto antes de buscar los términos de arriba.
+  ignorar:
+    - sistemas de gestion
+    - sistema de gestion
+    - sistemas integrados
+    - sistema integrado
+    - sistemas de calidad
+    - sistema de calidad
+    - sistemas hidraulicos
+    - sistemas electricos
+    - sistemas de riego
+    - redes sociales
+    - redes electricas
+    - redes de gas
+    - redes hidraulicas
+    - redes hidrosanitarias
+    - redes de acueducto
+    - redes de alcantarillado
+    - redes de distribucion
+    - redes de mercadeo
+    - infraestructura vial
+    - infraestructura fisica
+    - infraestructura civil
+    - obras de infraestructura
+    - tecnologia de alimentos
+    - tecnologia en alimentos
+    - software contable
+    - informatica basica
+    - base de datos de clientes
+    - bases de datos de clientes
+    - programacion de turnos
+    - programacion de produccion
+    - qa/qc
+    - servidor publico
+    - servidores publicos
+
   # Si alguno aparece en el TÍTULO, la vacante se descarta.
   excluir:
-    - asesor comercial
+    # Aprendices y practicantes
+    - aprendiz
+    - aprendices
+    - aprendizaje
+    - practicante
+    - practicantes
+    - practica
+    - practicas
+    - pasante
+    - pasantes
+    - pasantia
+    - intern
+    - internship
+    - trainee
+    - etapa productiva
+    - etapa lectiva
+    - sena
+    # Otras áreas
+    - comercial
     - vendedor
-    - mercaderista
-    - conductor
-    - auxiliar de bodega
-    - cajero
+    - vendedora
+    - ventas
+    - telemercadeo
+    - teleoperador
     - call center
+    - mercaderista
+    - impulsador
+    - impulsadora
+    - conductor
+    - mensajero
+    - domiciliario
+    - bodega
+    - cajero
+    - cajera
+    - contable
+    - contador
+    - contadora
+    - cartera
+    - enfermeria
+    - enfermero
+    - enfermera
+    - operario
+    - operaria
+    - cocinero
+    - cocinera
+    - mesero
+    - mesera
+    - servicios generales
+    - aseo
+    - vigilante
+    - electricista
+    - ingeniero civil
+    - community manager
+    - sales
+    - account executive
+    - account manager
+    - marketing
+    - recruiter
+    - copywriter
+    - security guard
+    - customer success
+    - customer solution
+    - product manager
+    - product marketing
+    - elearning
+    - art director
+    - phd
+    - guarda de seguridad
+    - seguridad fisica
+    - seguridad y salud
+
+  # Si alguno aparece en la DESCRIPCIÓN, la vacante se descarta (aprendices y
+  # prácticas que no lo dicen en el título).
+  excluir_descripcion:
+    - contrato de aprendizaje
+    - etapa productiva
+    - etapa practica
+    - practica profesional
+    - practicas profesionales
+    - cuota sena
+    - internship program
 
 # --- Ejecución ---
 ejecucion:
-  min_puntaje: 3            # puntaje mínimo para notificar (sube para menos ruido)
+  min_puntaje: 1            # puntaje mínimo (1 = todas las de sistemas; sube para menos ruido)
   dias_maximos: 10          # ignora vacantes publicadas hace más de N días (si se conoce la fecha)
-  max_por_ejecucion: 25     # tope de vacantes enviadas por ejecución
+  max_por_ejecucion: 40     # tope de vacantes enviadas por ejecución
   max_whatsapp: 10          # tope de mensajes de WhatsApp por ejecución
-  max_detalles: 120         # tope de páginas de detalle descargadas por ejecución
+  max_detalles: 150         # tope de páginas de detalle descargadas por ejecución
   pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
 
 # --- Fuentes ---
+# remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se
+#         consultan con `cada_horas` para respetar sus límites de uso.
 # jooble: agregador con API gratuita (requiere JOOBLE_API_KEY). Reúne vacantes de
 #         muchos portales colombianos (Computrabajo, elempleo, etc.).
 # html:   scraper genérico. `url` usa {q} (búsqueda) y `enlace_regex` reconoce los
@@ -168,3 +432,55 @@ fuentes:
       - nombre: magneto
         de: magneto365.com
         enlace_regex: 'https?://(?:www\.)?magneto365\.com/[^"\s<>]*empleos?/[^"\s<>]+'
+
+  # --- Teletrabajo en Colombia (cualquier ciudad) ---
+  # El filtro solo deja las que dicen remoto/teletrabajo y no son híbridas.
+  - nombre: computrabajo_remoto
+    tipo: html
+    activa: true
+    url: https://co.computrabajo.com/trabajo-de-{q}-remoto
+    enlace_regex: '/ofertas-de-trabajo/oferta-de-trabajo-de-[^"?#]+'
+    base: https://co.computrabajo.com
+
+  - nombre: elempleo_remoto
+    tipo: html
+    activa: true
+    url: https://www.elempleo.com/co/ofertas-empleo/trabajo-{q}-remoto
+    enlace_regex: '/co/ofertas-trabajo/[a-z0-9-]+-\d+'
+    base: https://www.elempleo.com
+
+  - nombre: jooble_remoto
+    tipo: jooble
+    activa: true
+    ubicaciones: [Colombia]
+    sufijo: remoto           # busca "sistemas remoto", "redes remoto"...
+
+  # --- Portales de teletrabajo (LatAm e internacionales) ---
+  - nombre: getonbrd         # LatAm, en español, muy fuerte en TI
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: remotive
+    tipo: remoto
+    activa: true
+    cada_horas: 8            # piden no consultar más de ~4 veces al día
+  - nombre: remoteok
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: jobicy           # solo vacantes abiertas a LATAM
+    tipo: remoto
+    activa: true
+    cada_horas: 6
+  - nombre: himalayas
+    tipo: remoto
+    activa: true
+    cada_horas: 6
+  - nombre: weworkremotely   # RSS: sysadmin/devops, soporte y programación
+    tipo: remoto
+    activa: true
+    cada_horas: 3
+  - nombre: workingnomads
+    tipo: remoto
+    activa: true
+    cada_horas: 6

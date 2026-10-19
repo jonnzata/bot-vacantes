@@ -15,6 +15,7 @@ class JoobleSource:
     def __init__(self, cfg: dict, http):
         self.name = cfg["nombre"]
         self.locations = cfg.get("ubicaciones", ["Antioquia"])
+        self.suffix = cfg.get("sufijo", "")  # p. ej. "remoto": se añade a cada búsqueda
         self.key = os.environ.get("JOOBLE_API_KEY", "")
         self.http = http
 
@@ -38,7 +39,7 @@ class JoobleSource:
         jobs = []
         for loc in self.locations:
             resp = self.http.post(API_URL.format(key=self.key),
-                                  json={"keywords": query, "location": loc})
+                                  json={"keywords": f"{query} {self.suffix}".strip(), "location": loc})
             jobs += self.parse(resp.json())
         log.info("%s: %d ofertas para %r", self.name, len(jobs), query)
         return jobs

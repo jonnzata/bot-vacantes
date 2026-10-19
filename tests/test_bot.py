@@ -188,3 +188,186 @@ def test_indeed_alert_email_uses_job_key():
     assert [j.url for j in jobs] == ["https://co.indeed.com/viewjob?jk=9f8e7d6c5b4a",
                                      "https://co.indeed.com/viewjob?jk=1234abcd"]
     assert jobs[0].uid != jobs[1].uid
+
+
+def _area_job(title, description=""):
+    return Job(title=title, url="u", source="t", location="Medellín, Antioquia", description=description)
+
+
+def test_rejects_non_it_jobs_with_ambiguous_words():
+    flt = make_filter(skills=("excel", "sql", "redes", "sap"))
+    for title, desc in [
+        ("Auxiliar de sistemas de gestión de calidad", "Apoyo al sistema integrado de gestión ISO 9001"),
+        ("Community Manager - Redes sociales", "Gestión de redes sociales"),
+        ("Ingeniero civil de infraestructura vial", "Obras de infraestructura"),
+        ("Asesor de ventas de tecnología", "Venta de celulares"),
+        ("Ejecutivo comercial TIC", "Venta de planes corporativos"),
+        ("Inspector QA/QC soldadura", "Control de calidad en obra"),
+        ("Auxiliar contable SAP", "Manejo de Excel"),
+        ("Profesional en tecnología de alimentos", "Control de calidad en planta"),
+        ("Auxiliar administrativo", "Software contable, informática básica y base de datos de clientes"),
+    ]:
+        assert flt.reject_reason(_area_job(title, desc)) is not None, title
+
+
+def test_ambiguous_title_needs_it_terms_in_full_description():
+    flt = make_filter()
+    relleno = "Responsabilidades del cargo y beneficios de la empresa. " * 8
+    assert flt.accept(_area_job("Ingeniero de infraestructura", relleno + "Servidores Linux y AWS"))
+    assert not flt.accept(_area_job("Ingeniero de infraestructura", relleno + "Obras y redes de acueducto"))
+    # Sin descripción completa (tarjeta de listado o de correo) basta el título.
+    assert flt.accept(_area_job("Analista de redes"))
+
+
+def test_it_terms_in_description_only():
+    flt = make_filter()
+    assert flt.accept(_area_job("Auxiliar III", "Soporte técnico a usuarios, servidores Windows y SQL"))
+    assert not flt.accept(_area_job("Auxiliar III", "Atención al cliente y manejo de software contable"))
+
+
+# --- Teletrabajo -----------------------------------------------------------------
+from bot.sources import remote_apis  # noqa: E402
+
+LARGA = "Join our team. We use Linux, AWS, Docker and Python every day. " * 6
+
+
+def test_remote_api_parsers():
+    jobs = remote_apis.parse_remotive({"jobs": [{
+        "title": "Senior DevOps Engineer", "url": "https://remotive.com/1", "company_name": "ACME",
+        "candidate_required_location": "LATAM", "description": "<p>Kubernetes</p>",
+        "publication_date": "2026-10-15T10:00:00"}]})
+    assert (jobs[0].title, jobs[0].location, jobs[0].published, jobs[0].remote) == (
+        "Senior DevOps Engineer", "LATAM", "2026-10-15", True)
+
+    jobs = remote_apis.parse_remoteok([{"legal": "aviso"}, {
+        "position": "IT Support Specialist", "url": "https://remoteok.com/2", "company": "Foo",
+        "location": "Worldwide", "description": "Helpdesk", "tags": ["support"], "date": "2026-10-14T00:00:00+00:00"}])
+    assert [j.title for j in jobs] == ["IT Support Specialist"] and "support" in jobs[0].description
+
+    jobs = remote_apis.parse_jobicy({"jobs": [{"jobTitle": "SOC Analyst", "url": "u", "companyName": "Sec",
+                                               "jobGeo": "LATAM", "jobDescription": "SIEM",
+                                               "pubDate": "2026-10-13 08:00:00"}]})
+    assert jobs[0].published == "2026-10-13"
+
+    jobs = remote_apis.parse_himalayas({"jobs": [{"title": "Cloud Engineer", "applicationLink": "u",
+                                                  "locationRestrictions": ["Colombia", "Mexico"],
+                                                  "description": "AWS", "pubDate": 1760400000}]})
+    assert jobs[0].location == "Colombia, Mexico" and jobs[0].published.startswith("2025")
+
+    rss = """<rss><channel><item><title>ACME: Linux Systems Administrator</title>
+      <region>Anywhere in the World</region><link>https://weworkremotely.com/x</link>
+      <pubDate>Tue, 14 Oct 2026 10:00:00 +0000</pubDate><description>&lt;p&gt;Linux&lt;/p&gt;</description>
+      </item></channel></rss>"""
+    job = remote_apis.parse_rss(rss)[0]
+    assert (job.company, job.title, job.published) == ("ACME", "Linux Systems Administrator", "2026-10-14")
+
+
+def test_getonbrd_modalities():
+    def item(modality, countries):
+        return {"id": "dev-1", "attributes": {"title": "Desarrollador Backend", "remote_modality": modality,
+                                              "countries": countries, "description": "Python",
+                                              "published_at": 1760400000},
+                "links": {"public_url": "https://www.getonbrd.com/jobs/dev-1"}}
+    jobs = remote_apis.parse_getonbrd({"data": [item("fully_remote", ["Chile"]),
+                                                item("remote_local", ["Chile"]),
+                                                item("remote_local", ["Colombia", "Peru"]),
+                                                item("hybrid", ["Colombia"])]})
+    flt = make_filter()
+    assert [flt.remote_ok(j) for j in jobs] == [True, False, True, False]
+    assert jobs[0].url == "https://www.getonbrd.com/jobs/dev-1"
+
+
+def _remote(title, location, description=LARGA):
+    job = Job(title=title, url="u", source="t", location=location, description=description)
+    job.remote = True
+    return job
+
+
+def test_remote_jobs_must_be_open_to_colombia():
+    flt = make_filter()
+    assert flt.accept(_remote("Site Reliability Engineer", "Worldwide"))
+    assert flt.accept(_remote("Security Engineer", "LATAM"))
+    assert flt.accept(_remote("IT Support Specialist", ""))
+    assert flt.accept(_remote("Cybersecurity Analyst", "USA, Colombia, Mexico"))
+    assert not flt.accept(_remote("Network Engineer", "USA only"))
+    assert not flt.accept(_remote("DevOps Engineer", "Europe"))
+    assert not flt.accept(_remote("Software Engineer (Hybrid)", "Worldwide"))
+    assert not flt.accept(_remote("Sales Development Representative", "Worldwide"))
+    assert not flt.accept(_remote("Security Guard", "Worldwide"))
+
+
+def test_remote_from_colombian_portals():
+    flt = make_filter()
+    tele = Job(title="Analista de ciberseguridad", url="u", source="t", location="Bogotá, D.C.",
+               description="Modalidad teletrabajo. SIEM y pentesting.")
+    hibrido = Job(title="Analista de ciberseguridad", url="u", source="t", location="Bogotá, D.C.",
+                  description="Modalidad híbrida, 3 días remoto.")
+    presencial = Job(title="Soporte técnico", url="u", source="t", location="Cali, Valle")
+    assert flt.accept(tele)
+    assert not flt.accept(hibrido)
+    assert not flt.accept(presencial)
+
+
+def test_jsonld_telecommute_marks_location():
+    data = {"@type": "JobPosting", "title": "Soporte TI", "jobLocationType": "TELECOMMUTE",
+            "jobLocation": {"address": {"addressLocality": "Bogotá"}}, "description": "Mesa de ayuda"}
+    parsed = parse_job_posting(f'<script type="application/ld+json">{json.dumps(data)}</script>')
+    assert parsed["location"] == "Bogotá, Remoto"
+    job = Job(title=parsed["title"], url="u", source="t", location=parsed["location"],
+              description=parsed["description"])
+    assert make_filter().accept(job)
+
+
+def test_sources_with_interval_are_not_queried_every_hour(tmp_path):
+    from bot.main import collect
+    from bot.storage import SeenStore
+
+    class Fake:
+        name, interval_hours, calls = "fake", 6, 0
+
+        def search(self, q):
+            Fake.calls += 1
+            return [Job(title="Desarrollador", url=f"https://x/{Fake.calls}", source="fake")]
+
+    seen = SeenStore(tmp_path / "seen.json")
+    assert len(collect([Fake()], ["sistemas"], seen)) == 1
+    seen.save()
+    again = SeenStore(tmp_path / "seen.json")
+    assert collect([Fake()], ["sistemas"], again) == [] and Fake.calls == 1
+
+
+def test_config_builds_all_sources():
+    from bot.sources import build_sources
+    names = [s.name for s in build_sources(CONFIG, http=None)]
+    for n in ("getonbrd", "remotive", "remoteok", "jobicy", "himalayas", "weworkremotely",
+              "workingnomads", "jooble_remoto"):
+        assert n in names
+
+
+def test_remote_location_noise_and_english_exclusions():
+    flt = make_filter()
+    assert flt.accept(_remote("Desarrollador Backend", "Remoto desde Remoto"))
+    assert not flt.accept(_remote("Enterprise Customer Success Manager", "Anywhere"))
+    assert not flt.accept(_remote("Product Manager, Platform", "Worldwide"))
+
+
+def test_rejects_apprentices_and_interns():
+    flt = make_filter()
+    for title in ["Aprendiz técnico en sistemas", "Practicante de ingeniería de sistemas",
+                  "Pasante desarrollo de software", "Software Engineering Intern", "Trainee DevOps",
+                  "Aprendiz SENA soporte técnico", "Práctica profesional en sistemas"]:
+        assert not flt.accept(_area_job(title)), title
+    job = _area_job("Auxiliar de sistemas", "Contrato de aprendizaje, etapa productiva. Soporte técnico.")
+    assert flt.reject_reason(job) == "aprendiz o practica"
+    assert flt.accept(_area_job("Internal IT Support Specialist", "Helpdesk, Active Directory"))
+
+
+def test_accepts_all_it_jobs_even_without_cv_matches():
+    flt = make_filter(skills=())
+    relleno = "Responsabilidades del cargo y beneficios de la empresa. " * 8
+    # Título ambiguo confirmado con términos de redes en español
+    assert flt.accept(_area_job("Analista de redes", relleno + "Configuración de switches, routers y firewall Fortinet"))
+    # Sin término en el título: dos términos técnicos en la descripción bastan
+    assert flt.accept(_area_job("Profesional II", "Administración de servidores y bases de datos SQL Server"))
+    assert flt.accept(_area_job("Técnico informático", ""))
+    assert not flt.accept(_area_job("Profesional universitario", relleno + "Servidor público de carrera administrativa"))
