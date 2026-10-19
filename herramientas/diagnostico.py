@@ -148,7 +148,40 @@ def resumir_correos():
                         break
 
 
+def remitentes_linkedin():
+    """Cuenta los correos de LinkedIn de los últimos 60 días por dirección de
+    remitente (sin mostrar contenido), en la bandeja y en 'Todos'."""
+    user = os.environ.get("SMTP_USER")
+    pwd = os.environ.get("SMTP_PASSWORD")
+    if not (user and pwd):
+        return
+    from datetime import date, timedelta
+    since = (date.today() - timedelta(days=60)).strftime("%d-%b-%Y")
+    with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
+        imap.login(user, pwd)
+        for carpeta in ("INBOX", '"[Gmail]/All Mail"', '"[Gmail]/Todos"'):
+            try:
+                ok, _ = imap.select(carpeta, readonly=True)
+            except Exception:
+                ok = "NO"
+            if ok != "OK":
+                continue
+            _, data = imap.search(None, "SINCE", since, "FROM", '"linkedin.com"')
+            ids = data[0].split() if data and data[0] else []
+            cuentas = {}
+            for msg_id in ids[-300:]:
+                _, md = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
+                raw = next((p[1] for p in md if isinstance(p, tuple)), b"").decode(errors="ignore")
+                m = re.search(r"[\w.+-]+@[\w.-]*linkedin\.com", raw)
+                addr = m.group(0).lower() if m else "?"
+                cuentas[addr] = cuentas.get(addr, 0) + 1
+            print(f"\n=== LinkedIn en {carpeta}: {len(ids)} correos (60 días) ===")
+            for addr, n in sorted(cuentas.items(), key=lambda x: -x[1]):
+                print(f"  {n:4}  {addr}")
+
+
 if __name__ == "__main__":
     probar_remotos()
     probar_urls()
     resumir_correos()
+    remitentes_linkedin()
