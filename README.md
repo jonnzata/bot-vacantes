@@ -63,6 +63,7 @@ El código debe quedar en la rama principal (`main`), porque GitHub solo ejecuta
 Las alertas a tu correo siguen igual. Además, cuando una vacante llega por las **alertas de LinkedIn** de tu Gmail, el bot lee la oferta pública y, si trae un **correo para enviar la HV**, te postula solo:
 
 - Envía desde tu Gmail un correo con tu **hoja de vida en PDF adjunta**. Si la oferta indica un asunto ("Asunto: …"), lo usa.
+- **Solo si la vacante cumple con tu hoja de vida** (`autopostulacion.perfil_hv`): el cargo es de tu área (infraestructura, redes, seguridad, cloud, soporte…), la oferta menciona al menos `min_coincidencias` habilidades de tu HV, no exige requisitos que no tienes (NSE4, CCNP, CISSP, inglés B2/C1…) ni más de `max_anios_experiencia` años. Las certificaciones que solo aparecen como *deseables* no descartan la vacante. Si no cumple, no se envía nada y el log dice por qué.
 - Solo postula a vacantes **presenciales en Medellín** o de **teletrabajo** (de Colombia o de otro país). Las híbridas se omiten.
 - Nunca envía a las empresas de `autopostulacion.excluir_empresas` (por ejemplo, tu empresa actual), ni dos veces a la misma vacante.
 - Envía como máximo `max_por_dia` correos al día y al final te manda un **resumen** de las postulaciones.

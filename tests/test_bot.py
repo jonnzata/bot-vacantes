@@ -394,7 +394,7 @@ class _FakeHttp:
 def _postulador(tmp_path, html=GUEST_HTML, **cfg):
     from bot.autopostular import AutoPostulador
     from bot.storage import SeenStore
-    config = {"autopostulacion": {"activa": True, "excluir_empresas": ["netmask"], **cfg}}
+    config = {"autopostulacion": {**CONFIG["autopostulacion"], "activa": True, **cfg}}
     cv = tmp_path / "hv.pdf"
     cv.write_bytes(b"%PDF-1.4 prueba")
     return AutoPostulador(config, _FakeHttp(html), SeenStore(tmp_path / "seen.json"), cv)
@@ -465,3 +465,38 @@ def test_autopostula_skips_netmask_and_no_email(tmp_path, monkeypatch):
     assert _postulador(tmp_path, html=netmask).run([_linkedin_job()], dry_run=True) == []
     sin_correo = GUEST_HTML.replace("talento@acmeredes.co", "nuestro portal")
     assert _postulador(tmp_path, html=sin_correo).run([_linkedin_job()], dry_run=True) == []
+
+
+def test_profile_matches_cv(tmp_path):
+    ap = _postulador(tmp_path)
+    mk = lambda title, desc: Job(title=title, url="u", source="s", description=desc)
+    azure = mk("Administrador(a) de Nube Azure / Windows Server",
+               "Administración de Windows Server, Active Directory y DNS, nube Azure, ITIL. "
+               "Mínimo 2-3 años de experiencia en administración de sistemas.")
+    assert ap.profile_ok(azure) is None
+    assert {"azure", "windows server", "active directory", "itil"} <= set(azure.matched_skills)
+    assert ap.profile_ok(mk("Desarrollador Python", "Python, Docker, Linux, SQL")) == "cargo fuera de tu perfil"
+    assert ap.profile_ok(mk("Cybersecurity IAM Specialist", "Experiencia con SailPoint, firewall, siem")) \
+        == "pide sailpoint"
+    assert ap.profile_ok(mk("Ingeniero de Redes", "Mínimo 8 años de experiencia con FortiGate, VPN y SD-WAN")) \
+        == "pide 8 años de experiencia"
+    assert ap.profile_ok(mk("Ingeniero de Soporte", "Atención a usuarios y manejo de impresoras")).startswith(
+        "pocas coincidencias")
+    english = mk("Network Security Engineer", "We are looking for an engineer with experience in Fortinet firewalls "
+                 "and VPN. You will work with our team and the customers, and you will own the network. "
+                 "We offer a great team for you and your career with the best experience.")
+    assert ap.profile_ok(english) == "oferta en inglés"
+
+
+def test_required_vs_desirable_certifications(tmp_path):
+    ap = _postulador(tmp_path)
+    upk = Job(title="Profesional certificado(a) en FORTINET NSE4", url="u", source="s",
+              location="Área metropolitana de Medellín",
+              description="Requisitos indispensables:\nContar con certificación Fortinet NSE4 vigente.\n"
+                          "Envía tu hoja de vida al correo: rrhh@upk.co")
+    assert ap.profile_ok(upk) == "pide nse4"
+    evertec = Job(title="Cybersecurity Specialist Automation", url="u", source="s",
+                  description="Lo que buscamos\nConocimientos de Linux y Windows.\nMonitorear el SIEM y gestionar "
+                              "incidentes y vulnerabilidades.\nValoraremos adicionalmente\n"
+                              "Certificaciones CISSP, Security+ u otras.")
+    assert ap.profile_ok(evertec) is None

@@ -389,6 +389,144 @@ autopostulacion:
   aceptar_hibrido: false       # false = las híbridas no se postulan
   # El teletrabajo (desde Colombia u otro país) siempre se acepta.
   max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
+
+  # Tu perfil (sacado de tu hoja de vida). La HV solo se envía si la vacante
+  # CUMPLE con él; si no, se omite y queda registrado el motivo en el log.
+  perfil_hv:
+    # El título debe ser de alguno de estos cargos...
+    cargos:
+      - infraestructura
+      - redes
+      - network
+      - networking
+      - seguridad
+      - ciberseguridad
+      - cybersecurity
+      - security
+      - soc
+      - noc
+      - cloud
+      - nube
+      - azure
+      - soporte
+      - support
+      - sistemas
+      - ti
+      - it
+      - sysadmin
+      - administrador de servidores
+      - administrador de plataforma
+      - devops
+      - helpdesk
+      - mesa de ayuda
+      - fortinet
+      - fortigate
+      - firewall
+    # ...y no de estos.
+    cargos_excluidos:
+      - desarrollador
+      - developer
+      - programador
+      - frontend
+      - backend
+      - full stack
+      - fullstack
+      - qa
+      - tester
+      - datos
+      - data
+      - sap
+      - salesforce
+      - comercial
+      - ventas
+      - preventa
+      - practicante
+      - aprendiz
+      - pasante
+      - intern
+      - electronico
+      - electrica
+    # Habilidades de tu HV: la descripción debe mencionar al menos `min_coincidencias`.
+    habilidades:
+      - fortigate
+      - fortinet
+      - fortimanager
+      - firewall
+      - firewalls
+      - vpn
+      - redes
+      - lan
+      - wan
+      - tcp/ip
+      - snmp
+      - zabbix
+      - monitoreo
+      - wazuh
+      - siem
+      - iso 27001
+      - drp
+      - bcp
+      - continuidad
+      - hardening
+      - nmap
+      - vulnerabilidades
+      - azure
+      - gcp
+      - google cloud
+      - docker
+      - docker compose
+      - contenedores
+      - linux
+      - windows server
+      - servidores
+      - active directory
+      - python
+      - ci/cd
+      - automatizacion
+      - sql
+      - power bi
+      - glpi
+      - itil
+      - mesa de servicio
+      - voip
+      - issabel
+      - aruba
+      - ubiquiti
+      - unifi
+      - bitdefender
+      - endpoint
+      - antivirus
+      - respaldos
+      - backup
+      - soporte n2
+      - soporte n3
+      - infraestructura
+      - ciberseguridad
+      - incidentes
+    min_coincidencias: 3
+    # Si la oferta pide algo de esto, se omite (no está en tu HV).
+    requisitos_que_no_cumplo:
+      - ccnp
+      - cissp
+      - cisa
+      - cism
+      - nse 4
+      - nse4
+      - nse 7
+      - nse7
+      - fcp
+      - sailpoint
+      - cyberark
+      - ingles avanzado
+      - ingles c1
+      - ingles b2
+      - bilingue
+      - english b2
+      - english c1
+      - fluent english
+      - advanced english
+    max_anios_experiencia: 6     # omite ofertas que piden más años de experiencia
+    omitir_ofertas_en_ingles: true   # tu nivel de inglés es B1
   max_detalles: 30             # páginas de LinkedIn leídas por ejecución
   # mensaje: |                 # opcional: tu propio texto. Variables: {cargo} {empresa}
   #   ...                      # {empresa_de} {coincidencias} {firma}

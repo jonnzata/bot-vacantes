@@ -47,6 +47,49 @@ Cordialmente,
 {firma}"""
 
 
+_YEARS_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:anos|years?)\b(?:\s+o\s+mas)?\s+(?:de\s+|of\s+)?(?:experiencia|experience)")
+_EN_WORDS = {"the", "and", "with", "you", "your", "our", "will", "for", "experience", "team", "we", "are"}
+_ES_WORDS = {"el", "la", "los", "las", "con", "para", "del", "experiencia", "equipo", "que", "una", "por"}
+
+
+def _years_required(desc_norm: str) -> int:
+    """Mayor número de años de experiencia que pide la oferta (0 si no dice)."""
+    return max((int(n) for n in _YEARS_RE.findall(desc_norm)), default=0)
+
+
+def _mostly_english(desc_norm: str) -> bool:
+    words = re.findall(r"[a-z]+", desc_norm)
+    en = sum(w in _EN_WORDS for w in words)
+    es = sum(w in _ES_WORDS for w in words)
+    return en >= 8 and en > 2 * es
+
+
+_NICE_TO_HAVE = ["deseable", "deseables", "valoramos", "valoraremos", "se valora", "plus", "un plus", "preferible",
+                 "nice to have", "desirable", "is an asset", "bonus", "no excluyente", "opcional"]
+_MUST_HEADERS = ["requisitos", "requerimos", "buscamos", "lo que buscamos", "perfil", "obligatorio", "indispensable",
+                 "excluyente", "requirements", "qualifications", "must have"]
+
+
+def _required_terms(description: str, terms) -> list:
+    """Términos de `terms` que la oferta pide como REQUISITO. Si solo aparecen
+    como deseables ("valoraremos", "deseable", "plus"...), no cuentan."""
+    found, nice = [], False
+    for raw in description.splitlines():
+        line = normalize(raw)
+        if not line:
+            continue
+        hits = matched_terms(line, terms)
+        if matched_terms(line, _NICE_TO_HAVE):
+            nice = True  # esta línea y su bloque son deseables
+            if hits:
+                continue
+        elif matched_terms(line, _MUST_HEADERS) and not hits:
+            nice = False  # empieza un bloque de requisitos
+        if hits and not nice:
+            found += [h for h in hits if h not in found]
+    return found
+
+
 def linkedin_id(job):
     m = _LINKEDIN_ID.search(job.url)
     return m.group(1) if m else None
@@ -81,6 +124,14 @@ class AutoPostulador:
         self.max_per_day = cfg.get("max_por_dia", 15)
         self.max_details = cfg.get("max_detalles", 30)
         self.body_tpl = cfg.get("mensaje") or DEFAULT_BODY
+        hv = cfg.get("perfil_hv", {})
+        self.roles = hv.get("cargos", [])
+        self.excluded_roles = hv.get("cargos_excluidos", [])
+        self.cv_skills = hv.get("habilidades", [])
+        self.min_matches = hv.get("min_coincidencias", 3)
+        self.missing_reqs = hv.get("requisitos_que_no_cumplo", [])
+        self.max_years = hv.get("max_anios_experiencia", 0)
+        self.skip_english = hv.get("omitir_ofertas_en_ingles", False)
         self.http = http
         self.seen = seen
         self.cv_path = cv_path
@@ -115,6 +166,28 @@ class AutoPostulador:
         if matched_terms(where, self.onsite_towns):
             return None  # presencial en Medellín
         return "presencial fuera de Medellín"
+
+    def profile_ok(self, job):
+        """None si la vacante encaja con tu HV; si no, el motivo. Guarda en
+        job.matched_skills las habilidades de tu HV que pide la oferta."""
+        title = normalize(job.title)
+        desc = normalize(job.description)
+        if self.excluded_roles and matched_terms(title, self.excluded_roles):
+            return "cargo fuera de tu perfil"
+        if self.roles and not matched_terms(title, self.roles):
+            return "cargo fuera de tu perfil"
+        if self.skip_english and _mostly_english(desc):
+            return "oferta en inglés"
+        missing = _required_terms(job.description, self.missing_reqs)
+        if missing:
+            return f"pide {missing[0]}"
+        years = _years_required(desc)
+        if self.max_years and years > self.max_years:
+            return f"pide {years} años de experiencia"
+        job.matched_skills = matched_terms(f"{title} {desc}", self.cv_skills)
+        if len(job.matched_skills) < self.min_matches:
+            return f"pocas coincidencias con tu HV ({len(job.matched_skills)})"
+        return None
 
     # --- datos de la vacante ---------------------------------------------------------
     def enrich(self, job) -> bool:
@@ -213,7 +286,8 @@ class AutoPostulador:
             repeated = any(f"postulada_correo:{a}|{normalize(job.title)}" in self.seen for a in to)
             reason = ("sin correo de contacto" if not to else
                       "ya se envió a ese correo" if repeated else
-                      "empresa excluida" if self.excluded_company(job, to) else self.place_ok(job))
+                      "empresa excluida" if self.excluded_company(job, to) else
+                      self.place_ok(job) or self.profile_ok(job))
             if reason:
                 log.info("No se postula [%s]: %s | %s", reason, job.title, job.company or "-")
                 self.seen.add(f"revisada:{job.uid}")
@@ -249,6 +323,7 @@ class AutoPostulador:
         lines = [f"Se envió tu hoja de vida a {len(done)} vacante(s) de LinkedIn:\n"]
         for job, to in done:
             lines.append(f"• {job.title} — {job.company or 'empresa no indicada'} ({job.location or '-'})\n"
+                         f"  Coincide con tu HV: {', '.join(job.matched_skills[:10])}\n"
                          f"  Correo: {', '.join(to)}\n  Oferta: {job.link}\n")
         msg = MIMEText("\n".join(lines), "plain", "utf-8")
         msg["Subject"] = f"📨 {len(done)} postulación(es) automática(s) enviadas"
