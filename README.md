@@ -58,6 +58,36 @@ Puedes configurar solo el correo, solo WhatsApp o los dos.
 
 El código debe quedar en la rama principal (`main`), porque GitHub solo ejecuta desde ahí las tareas programadas. Después, en la pestaña **Actions → Bot de vacantes → Run workflow**, puedes lanzarlo a mano para probarlo.
 
+## Postulación automática (LinkedIn)
+
+Las alertas a tu correo siguen igual. Además, cuando una vacante llega por las **alertas de LinkedIn** de tu Gmail, el bot lee la oferta pública y, si trae un **correo para enviar la HV**, te postula solo:
+
+- Envía desde tu Gmail un correo con tu **hoja de vida en PDF adjunta**. Si la oferta indica un asunto ("Asunto: …"), lo usa.
+- Solo postula a vacantes **presenciales en Medellín** o de **teletrabajo** (de Colombia o de otro país). Las híbridas se omiten.
+- Nunca envía a las empresas de `autopostulacion.excluir_empresas` (por ejemplo, tu empresa actual), ni dos veces a la misma vacante.
+- Envía como máximo `max_por_dia` correos al día y al final te manda un **resumen** de las postulaciones.
+
+### Activarla
+
+1. En LinkedIn, crea alertas de empleo (Medellín y "En remoto") para que lleguen a tu Gmail.
+2. Cifra tu HV y súbela al repositorio. El repo es público, así que solo se sube cifrada (PowerShell, con Git para Windows):
+   ```powershell
+   copy C:\ruta\HDVJONNY.pdf cv\hoja_de_vida.pdf
+   & "C:\Program Files\Git\usr\bin\gpg.exe" --symmetric --cipher-algo AES256 --output cv/hoja_de_vida.pdf.gpg cv/hoja_de_vida.pdf
+   git add cv/hoja_de_vida.pdf.gpg
+   git commit -m "HV cifrada"
+   git push
+   ```
+3. Agrega estos secrets:
+
+| Secret | Ejemplo |
+|---|---|
+| `CV_GPG_PASSPHRASE` | la clave que usaste al cifrar |
+| `NOMBRE_REMITENTE` | `Jonny Alberto Zapata Taborda` |
+| `FIRMA_CORREO` | `Jonny Alberto Zapata Taborda\nIngeniero Informático\n333 430 6808` (`\n` = salto de línea) |
+
+Para probar sin enviar nada: `python -m bot.main --dry-run` muestra a quién se postularía.
+
 ## Ajustes (`config.yaml`)
 
 - `perfil.busquedas`: los términos que se buscan en los portales.

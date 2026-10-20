@@ -371,3 +371,97 @@ def test_accepts_all_it_jobs_even_without_cv_matches():
     assert flt.accept(_area_job("Profesional II", "Administración de servidores y bases de datos SQL Server"))
     assert flt.accept(_area_job("Técnico informático", ""))
     assert not flt.accept(_area_job("Profesional universitario", relleno + "Servidor público de carrera administrativa"))
+
+
+# --- Postulación automática ---------------------------------------------------------
+GUEST_HTML = """<section>
+<h2 class="top-card-layout__title">Ingeniero de Redes y Seguridad</h2>
+<a class="topcard__org-name-link">Acme Redes SAS</a>
+<span class="topcard__flavor topcard__flavor--bullet">Medellín, Antioquia, Colombia</span>
+<div class="show-more-less-html__markup">Buscamos ingeniero con FortiGate y Zabbix. Trabajo presencial.
+Envía tu hoja de vida a talento@acmeredes.co con el Asunto: Ingeniero Redes MDE</div>
+</section>"""
+
+
+class _FakeHttp:
+    def __init__(self, html):
+        self.html = html
+
+    def get(self, url):
+        return type("R", (), {"text": self.html})()
+
+
+def _postulador(tmp_path, html=GUEST_HTML, **cfg):
+    from bot.autopostular import AutoPostulador
+    from bot.storage import SeenStore
+    config = {"autopostulacion": {"activa": True, "excluir_empresas": ["netmask"], **cfg}}
+    cv = tmp_path / "hv.pdf"
+    cv.write_bytes(b"%PDF-1.4 prueba")
+    return AutoPostulador(config, _FakeHttp(html), SeenStore(tmp_path / "seen.json"), cv)
+
+
+def _linkedin_job(title="Ingeniero de Redes", desc="Medellín, Antioquia"):
+    return Job(title=title, url="https://www.linkedin.com/jobs/view/4011223344/",
+               source="alertas_correo (linkedin)", description=desc, enriched=True)
+
+
+def test_guest_posting_and_subject(tmp_path):
+    ap = _postulador(tmp_path)
+    job = _linkedin_job()
+    assert ap.enrich(job)
+    assert job.company == "Acme Redes SAS" and job.location.startswith("Medellín")
+    assert ap.clean_emails(job.emails) == ["talento@acmeredes.co"]
+    assert ap.subject_for(job) == "Ingeniero Redes MDE"
+    assert ap.place_ok(job) is None
+
+
+def test_place_rules(tmp_path):
+    ap = _postulador(tmp_path)
+    mk = lambda loc, desc: Job(title="Ingeniero", url="u", source="s", location=loc, description=desc)
+    assert ap.place_ok(mk("Bogotá, Colombia", "Trabajo presencial")) == "presencial fuera de Medellín"
+    assert ap.place_ok(mk("Medellín, Antioquia", "Modalidad híbrida 3x2")) == "híbrida"
+    assert ap.place_ok(mk("Madrid, España", "Puesto 100% remoto")) is None
+    assert ap.place_ok(mk("United States", "Fully remote position")) is None
+
+
+def test_excludes_current_employer(tmp_path):
+    ap = _postulador(tmp_path)
+    job = Job(title="Ingeniero NOC", url="u", source="s", company="Netmask Latam", description="x")
+    assert ap.excluded_company(job, ["rrhh@otra.com"])
+    job = Job(title="Ingeniero NOC", url="u", source="s", company="Reclutadora", description="x")
+    assert ap.excluded_company(job, ["seleccion@netmask.co"])
+    assert not ap.excluded_company(job, ["seleccion@acme.co"])
+
+
+def test_autopostula_sends_cv_once(tmp_path, monkeypatch):
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def login(self, *a): pass
+        def sendmail(self, frm, to, raw): sent.append((to, raw))
+
+    import bot.autopostular as mod
+    monkeypatch.setattr(mod.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    ap = _postulador(tmp_path)
+    other = Job(title="Dev", url="https://computrabajo.com/x", source="computrabajo", description="a@b.co")
+    done = ap.run([_linkedin_job(), other])
+    assert len(done) == 1
+    assert sent[0][0] == ["talento@acmeredes.co"]
+    assert "hv.pdf" in sent[0][1] and "Ingeniero Redes MDE" in sent[0][1]
+    assert sent[1][0] == ["yo@gmail.com"]          # resumen para ti
+    assert ap.run([_linkedin_job()]) == []          # no se repite
+    assert len(sent) == 2
+
+
+def test_autopostula_skips_netmask_and_no_email(tmp_path, monkeypatch):
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    netmask = GUEST_HTML.replace("Acme Redes SAS", "Netmask")
+    assert _postulador(tmp_path, html=netmask).run([_linkedin_job()], dry_run=True) == []
+    sin_correo = GUEST_HTML.replace("talento@acmeredes.co", "nuestro portal")
+    assert _postulador(tmp_path, html=sin_correo).run([_linkedin_job()], dry_run=True) == []

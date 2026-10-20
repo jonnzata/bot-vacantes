@@ -5,6 +5,9 @@ perfil:
   # Ruta a tu hoja de vida (PDF o TXT). Opcional: si no existe se usa la
   # variable de entorno CV_TEXT (útil para no subir tu HV al repositorio).
   hoja_de_vida: cv/hoja_de_vida.pdf
+  # PDF que se adjunta en las postulaciones automáticas. En GitHub Actions se
+  # descifra desde cv/hoja_de_vida.pdf.gpg (ver README).
+  hoja_de_vida_pdf: cv/hoja_de_vida.pdf
 
   # Términos que se buscan en los portales.
   busquedas:
@@ -371,6 +374,24 @@ ejecucion:
   max_whatsapp: 10          # tope de mensajes de WhatsApp por ejecución
   max_detalles: 150         # tope de páginas de detalle descargadas por ejecución
   pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
+
+# --- Postulación automática (solo vacantes de LinkedIn con correo) ---
+# Las alertas normales a tu correo siguen igual. Además, si una vacante que llegó
+# por las alertas de LinkedIn trae un correo para enviar la HV y cumple estas
+# reglas, el bot te postula solo y al final te manda un resumen.
+autopostulacion:
+  activa: true
+  fuentes: [linkedin]          # de qué alertas se postula automáticamente
+  excluir_empresas:            # nunca se envía la HV a estas empresas
+    - netmask
+  ciudades_presencial:         # presencial: solo en estas ciudades
+    - medellin
+  aceptar_hibrido: false       # false = las híbridas no se postulan
+  # El teletrabajo (desde Colombia u otro país) siempre se acepta.
+  max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
+  max_detalles: 30             # páginas de LinkedIn leídas por ejecución
+  # mensaje: |                 # opcional: tu propio texto. Variables: {cargo} {empresa}
+  #   ...                      # {empresa_de} {coincidencias} {firma}
 
 # --- Fuentes ---
 # remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se
