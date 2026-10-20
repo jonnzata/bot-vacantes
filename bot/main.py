@@ -11,6 +11,7 @@ from pathlib import Path
 
 import yaml
 
+from .autopostular import AutoPostulador
 from .cv import extract_skills, load_cv_text
 from .filters import JobFilter
 from .http import Http
@@ -110,10 +111,20 @@ def run(config_path: Path, dry_run: bool) -> list:
     log.info("Descartes: %s", ", ".join(f"{k} = {v}" for k, v in sorted(reasons.items())) or "ninguno")
     log.info("%d vacantes cumplen los filtros (%s)", len(accepted), _count(accepted))
     accepted.sort(key=lambda j: j.score, reverse=True)
+
+    # Postulación automática (vacantes de LinkedIn con correo de contacto).
+    cv_path = BASE_DIR / profile.get("hoja_de_vida_pdf", "cv/hoja_de_vida.pdf")
+    try:
+        applied = AutoPostulador(config, http, seen, cv_path).run(accepted, dry_run)
+        log.info("Postulaciones automáticas: %d", len(applied))
+    except Exception as exc:  # nunca debe detener las alertas normales
+        log.error("Falló la postulación automática: %s", exc)
+
     accepted = interleave(accepted, by_source)[: run_cfg.get("max_por_ejecucion", 25)]
     log.info("%d vacantes se envían (%s)", len(accepted), _count(accepted))
 
     if dry_run:
+        print("\n=== Alertas que se enviarían a tu correo ===")
         for job in accepted:
             print(f"\n[{job.score}] " + job_to_text(job))
         return accepted

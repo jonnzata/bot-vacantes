@@ -38,6 +38,19 @@ jobs:
           key: job-bot-seen-${{ github.run_id }}
           restore-keys: job-bot-seen-
 
+      # Hoja de vida cifrada en el repo (el repo es público): se descifra aquí.
+      - name: Descifrar hoja de vida
+        env:
+          CV_GPG_PASSPHRASE: ${{ secrets.CV_GPG_PASSPHRASE }}
+        run: |
+          if [ -n "$CV_GPG_PASSPHRASE" ] && [ -f cv/hoja_de_vida.pdf.gpg ]; then
+            gpg --quiet --batch --yes --pinentry-mode loopback --passphrase "$CV_GPG_PASSPHRASE" \
+                --output cv/hoja_de_vida.pdf --decrypt cv/hoja_de_vida.pdf.gpg
+            echo "Hoja de vida lista para las postulaciones"
+          else
+            echo "Sin hoja de vida cifrada: no habrá postulaciones automáticas"
+          fi
+
       - name: Buscar y notificar
         env:
           JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
@@ -47,6 +60,8 @@ jobs:
           WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
           CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
           CV_TEXT: ${{ secrets.CV_TEXT }}
+          NOMBRE_REMITENTE: ${{ secrets.NOMBRE_REMITENTE }}
+          FIRMA_CORREO: ${{ secrets.FIRMA_CORREO }}
         run: python -m bot.main
 
       - name: Guardar vacantes vistas
