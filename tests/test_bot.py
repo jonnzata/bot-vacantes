@@ -400,6 +400,21 @@ def _postulador(tmp_path, html=GUEST_HTML, **cfg):
     return AutoPostulador(config, _FakeHttp(html), SeenStore(tmp_path / "seen.json"), cv)
 
 
+def _fake_sent_folder(already):
+    class FakeSent:
+        opened = 0
+
+        def __init__(self, *a):
+            FakeSent.opened += 1
+
+        def contains(self, addr, days):
+            return addr in already
+
+        def close(self):
+            pass
+    return FakeSent
+
+
 def _linkedin_job(title="Ingeniero de Redes", desc="Medellín, Antioquia"):
     return Job(title=title, url="https://www.linkedin.com/jobs/view/4011223344/",
                source="alertas_correo (linkedin)", description=desc, enriched=True)
@@ -445,6 +460,7 @@ def test_autopostula_sends_cv_once(tmp_path, monkeypatch):
 
     import bot.autopostular as mod
     monkeypatch.setattr(mod.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setattr(mod, "SentFolder", _fake_sent_folder(set()))
     monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
     monkeypatch.setenv("SMTP_PASSWORD", "x")
     ap = _postulador(tmp_path)
@@ -500,3 +516,76 @@ def test_required_vs_desirable_certifications(tmp_path):
                               "incidentes y vulnerabilidades.\nValoraremos adicionalmente\n"
                               "Certificaciones CISSP, Security+ u otras.")
     assert ap.profile_ok(evertec) is None
+
+
+class _FakeSMTP:
+    sent = []
+
+    def __init__(self, *a, **k): pass
+    def __enter__(self): return self
+    def __exit__(self, *a): pass
+    def login(self, *a): pass
+    def sendmail(self, frm, to, raw): _FakeSMTP.sent.append(to)
+
+
+def _smtp_env(monkeypatch, already=()):
+    import bot.autopostular as mod
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(mod.smtplib, "SMTP_SSL", _FakeSMTP)
+    monkeypatch.setattr(mod, "SentFolder", _fake_sent_folder(set(already)))
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+
+
+def test_skips_if_already_in_gmail_sent(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch, already={"talento@acmeredes.co"})
+    ap = _postulador(tmp_path)
+    assert ap.run([_linkedin_job()]) == []
+    assert _FakeSMTP.sent == []
+    assert ap.already_applied("talento@acmeredes.co")   # queda en la memoria del bot
+
+
+def test_never_writes_twice_to_same_address(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    ap = _postulador(tmp_path)
+    first = _linkedin_job()
+    second = Job(title="Analista de Redes", url="https://www.linkedin.com/jobs/view/4099999999/",
+                 source="alertas_correo (linkedin)", description="Medellín", enriched=True)
+    assert len(ap.run([first, second])) == 1     # misma dirección en las dos ofertas
+    assert _FakeSMTP.sent[0] == ["talento@acmeredes.co"]
+    ap.seen.save()
+    from bot.storage import SeenStore
+    ap2 = _postulador(tmp_path)
+    ap2.seen = SeenStore(tmp_path / "seen.json")  # memoria tras reiniciar
+    third = Job(title="Ingeniero NOC", url="https://www.linkedin.com/jobs/view/4088888888/",
+                source="alertas_correo (linkedin)", description="Medellín", enriched=True)
+    assert ap2.run([third]) == []
+
+
+def test_no_send_if_sent_folder_unavailable(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    import bot.autopostular as mod
+
+    class Broken:
+        def __init__(self, *a):
+            raise OSError("imap caído")
+    monkeypatch.setattr(mod, "SentFolder", Broken)
+    assert _postulador(tmp_path).run([_linkedin_job()]) == []
+    assert _FakeSMTP.sent == []
+
+
+def test_sent_folder_finds_localized_name(monkeypatch):
+    import bot.autopostular as mod
+
+    class FakeImap:
+        def __init__(self, host): self.selected = None
+        def login(self, *a): pass
+        def list(self):
+            return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren \\Sent) "/" "[Gmail]/Enviados"']
+        def select(self, name, readonly): self.selected = name; return "OK", [b"3"]
+        def search(self, *crit): return "OK", [b"7" if '"rrhh@x.co"' in crit else b""]
+        def logout(self): pass
+    monkeypatch.setattr(mod.imaplib, "IMAP4_SSL", FakeImap)
+    folder = mod.SentFolder("h", "u", "p")
+    assert folder.imap.selected == '"[Gmail]/Enviados"'
+    assert folder.contains("rrhh@x.co", 120) and not folder.contains("otro@x.co", 120)

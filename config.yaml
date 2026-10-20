@@ -389,6 +389,9 @@ autopostulacion:
   aceptar_hibrido: false       # false = las híbridas no se postulan
   # El teletrabajo (desde Colombia u otro país) siempre se acepta.
   max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
+  # Memoria: nunca se escribe dos veces al mismo correo. Además del registro del
+  # bot, antes de enviar revisa tu carpeta de Enviados de Gmail de los últimos N días.
+  revisar_enviados_dias: 120
 
   # Tu perfil (sacado de tu hoja de vida). La HV solo se envía si la vacante
   # CUMPLE con él; si no, se omite y queda registrado el motivo en el log.

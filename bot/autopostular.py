@@ -10,11 +10,12 @@ Flujo (en cada ejecución, después de filtrar las vacantes):
 4. Al final te manda un resumen con las postulaciones enviadas.
 
 Las reglas se ajustan en `config.yaml` → `autopostulacion`."""
+import imaplib
 import logging
 import os
 import re
 import smtplib
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -124,6 +125,9 @@ class AutoPostulador:
         self.max_per_day = cfg.get("max_por_dia", 15)
         self.max_details = cfg.get("max_detalles", 30)
         self.body_tpl = cfg.get("mensaje") or DEFAULT_BODY
+        self.sent_days = cfg.get("revisar_enviados_dias", 120)
+        self.imap_host = os.environ.get("IMAP_HOST", "imap.gmail.com")
+        self._sent = None  # SentFolder, se abre la primera vez que se necesita
         hv = cfg.get("perfil_hv", {})
         self.roles = hv.get("cargos", [])
         self.excluded_roles = hv.get("cargos_excluidos", [])
@@ -283,7 +287,8 @@ class AutoPostulador:
                 log.warning("No se pudo leer %s: %s", job.url, exc)
                 continue
             to = self.clean_emails(job.emails)
-            repeated = any(f"postulada_correo:{a}|{normalize(job.title)}" in self.seen for a in to)
+            planned = {a for _, addrs in plan for a in addrs}
+            repeated = any(self.already_applied(a) or a in planned for a in to)
             reason = ("sin correo de contacto" if not to else
                       "ya se envió a ese correo" if repeated else
                       "empresa excluida" if self.excluded_company(job, to) else
@@ -300,6 +305,17 @@ class AutoPostulador:
                       f"\n   Asunto: {self.subject_for(job)}")
             return [j for j, _ in plan]
 
+        # Segunda memoria: tu carpeta de Enviados de Gmail (no se pierde aunque
+        # GitHub borre el caché). Si no se puede revisar, no se envía nada.
+        if plan:
+            try:
+                plan = [(job, to) for job, to in plan if not self._in_sent_folder(job, to)]
+            except Exception as exc:
+                log.error("No se pudo revisar Enviados en Gmail (%s): no se envía nada en esta ejecución", exc)
+                return []
+            finally:
+                self._close_sent()
+
         done = []
         if plan:
             with self._smtp() as server:
@@ -311,13 +327,37 @@ class AutoPostulador:
                         continue
                     self.seen.add(f"postulada:{job.uid}")
                     for addr in to:
-                        self.seen.add(f"postulada_correo:{addr}|{normalize(job.title)}")
+                        self.seen.add(f"postulada_correo:{addr}")
                     done.append((job, to))
                     log.info("HV enviada a %s (%s)", ", ".join(to), job.title)
                 if done:
                     server.sendmail(self.user, [a.strip() for a in self.report_to.split(",")],
                                     self.summary(done).as_string())
         return [j for j, _ in done]
+
+    # --- memoria: ¿ya se le escribió a ese correo? -------------------------------------
+    def already_applied(self, addr: str) -> bool:
+        """Registro del bot (caché de GitHub Actions)."""
+        return f"postulada_correo:{addr}" in self.seen
+
+    def _in_sent_folder(self, job, to) -> bool:
+        for addr in to:
+            if self._sent_folder().contains(addr, self.sent_days):
+                log.info("No se postula [ya le escribiste a %s, ver Enviados]: %s", addr, job.title)
+                self.seen.add(f"postulada_correo:{addr}")  # se recuerda para no volver a buscarlo
+                self.seen.add(f"revisada:{job.uid}")
+                return True
+        return False
+
+    def _sent_folder(self):
+        if self._sent is None:
+            self._sent = SentFolder(self.imap_host, self.user, self.password)
+        return self._sent
+
+    def _close_sent(self):
+        if self._sent is not None:
+            self._sent.close()
+            self._sent = None
 
     def summary(self, done) -> MIMEText:
         lines = [f"Se envió tu hoja de vida a {len(done)} vacante(s) de LinkedIn:\n"]
@@ -330,3 +370,38 @@ class AutoPostulador:
         msg["From"] = self.user
         msg["To"] = self.report_to
         return msg
+
+
+class SentFolder:
+    """Carpeta de Enviados de Gmail (IMAP, solo lectura). Gmail la nombra según
+    el idioma ("[Gmail]/Enviados", "[Gmail]/Sent Mail"), por eso se busca por
+    su marca \\Sent."""
+
+    def __init__(self, host, user, password):
+        self.imap = imaplib.IMAP4_SSL(host)
+        self.imap.login(user, password)
+        folder = self._find_sent()
+        status, _ = self.imap.select(f'"{folder}"', readonly=True)
+        if status != "OK":
+            raise RuntimeError(f"no se pudo abrir {folder}")
+
+    def _find_sent(self) -> str:
+        _, folders = self.imap.list()
+        for raw in folders or []:
+            line = raw.decode(errors="ignore") if isinstance(raw, bytes) else str(raw)
+            if "\\Sent" in line:
+                return line.rsplit(' "/" ', 1)[-1].strip().strip('"')
+        raise RuntimeError("no se encontró la carpeta de Enviados")
+
+    def contains(self, addr: str, days: int) -> bool:
+        since = (date.today() - timedelta(days=days)).strftime("%d-%b-%Y")
+        status, data = self.imap.search(None, "SINCE", since, "TO", f'"{addr}"')
+        if status != "OK":
+            raise RuntimeError(f"búsqueda en Enviados falló para {addr}")
+        return bool(data and data[0].split())
+
+    def close(self):
+        try:
+            self.imap.logout()
+        except Exception:
+            pass
