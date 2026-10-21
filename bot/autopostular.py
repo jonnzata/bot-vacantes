@@ -75,6 +75,9 @@ def skills_text(skills) -> str:
     if "LAN" in names and "WAN" in names:
         names[names.index("LAN")] = "LAN/WAN"
         names.remove("WAN")
+    if "redes" in names and "LAN/WAN" in names:
+        names[names.index("LAN/WAN")] = "redes LAN/WAN"
+        names.remove("redes")
     return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} y {names[-1]}" if names else ""
 
 

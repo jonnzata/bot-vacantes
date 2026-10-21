@@ -862,7 +862,7 @@ def test_sent_folder_contains_vacancy(monkeypatch):
 def test_email_text_formats_skills_and_attachment(tmp_path, monkeypatch):
     from bot.autopostular import skills_text
     assert skills_text(["fortigate", "firewall", "firewalls", "vpn", "redes", "lan", "wan"]) == \
-        "FortiGate, firewall, VPN, redes y LAN/WAN"
+        "FortiGate, firewall, VPN y redes LAN/WAN"
     assert skills_text(["python"]) == "Python" and skills_text([]) == ""
     monkeypatch.setenv("NOMBRE_REMITENTE", "Jonny Alberto Zapata Taborda")
     ap = _postulador(tmp_path)
