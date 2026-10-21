@@ -1,0 +1,31 @@
+name: Probar correo de postulación
+
+# Envía a tu propio correo un ejemplo del correo de postulación automática
+# (con la hoja de vida adjunta). Nunca se envía a otra dirección.
+on:
+  workflow_dispatch:
+
+jobs:
+  probar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Descifrar hoja de vida
+        env:
+          CV_GPG_PASSPHRASE: ${{ secrets.CV_GPG_PASSPHRASE }}
+        run: |
+          gpg --quiet --batch --yes --pinentry-mode loopback --passphrase "$CV_GPG_PASSPHRASE" \
+              --output cv/hoja_de_vida.pdf --decrypt cv/hoja_de_vida.pdf.gpg
+      - name: Enviar correo de prueba
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          NOMBRE_REMITENTE: ${{ secrets.NOMBRE_REMITENTE }}
+          FIRMA_CORREO: ${{ secrets.FIRMA_CORREO }}
+        run: python herramientas/probar_postulacion.py
