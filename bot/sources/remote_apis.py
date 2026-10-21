@@ -147,7 +147,7 @@ PORTALES = {
                         "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss"],
                        parse_rss, False),
     "workingnomads": (["https://www.workingnomads.com/api/exposed_jobs/"], parse_workingnomads, False),
-    "getonbrd": (["https://www.getonbrd.com/api/v0/search/jobs?query={q}&per_page=50&expand=[\"company\"]"],
+    "getonbrd": (["https://www.getonbrd.com/api/v0/search/jobs?query={q}&per_page=50"],
                  parse_getonbrd, True),
 }
 

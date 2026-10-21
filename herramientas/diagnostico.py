@@ -158,7 +158,10 @@ def remitentes_linkedin():
             print(f"\n(buzón {nombre}: sin credenciales)")
             continue
         print(f"\n##### buzón {nombre} #####")
-        _contar_linkedin(user, pwd)
+        try:
+            _contar_linkedin(user, pwd)
+        except Exception as exc:
+            print(f"ERR  {exc!r}")
 
 
 def _contar_linkedin(user, pwd):
@@ -176,10 +179,13 @@ def _contar_linkedin(user, pwd):
             _, data = imap.search(None, "SINCE", since, "FROM", '"linkedin.com"')
             ids = data[0].split() if data and data[0] else []
             cuentas = {}
-            for msg_id in ids[-300:]:
-                _, md = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
-                raw = next((p[1] for p in md if isinstance(p, tuple)), b"").decode(errors="ignore")
-                m = re.search(r"[\w.+-]+@[\w.-]*linkedin\.com", raw)
+            # Una sola petición para todos los encabezados (de uno en uno Gmail corta).
+            lote = b",".join(ids[-300:])
+            _, md = imap.fetch(lote, "(BODY.PEEK[HEADER.FIELDS (FROM)])") if lote else (None, [])
+            for parte in md:
+                if not isinstance(parte, tuple):
+                    continue
+                m = re.search(r"[\w.+-]+@[\w.-]*linkedin\.com", parte[1].decode(errors="ignore"))
                 addr = m.group(0).lower() if m else "?"
                 cuentas[addr] = cuentas.get(addr, 0) + 1
             print(f"\n=== LinkedIn en {carpeta}: {len(ids)} correos (60 días) ===")

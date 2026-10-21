@@ -10,6 +10,8 @@ import logging
 import os
 import re
 
+import requests
+
 from ..models import Job
 from ..text import html_to_text
 
@@ -82,12 +84,22 @@ class LinkedInPostsSource:
         jobs = []
         headers = {"X-Subscription-Token": self.key, "Accept": "application/json"}
         for q in self.queries:
-            resp = self.http.get(API_URL, headers=headers, params={
-                "q": q, "count": 20, "country": "co", "search_lang": "es", "freshness": self.freshness,
-            })
-            jobs += self.parse(resp.json())
+            jobs += self.parse(self._query(q, headers))
         log.info("%s: %d publicaciones encontradas", self.name, len(jobs))
         return jobs
+
+    def _query(self, q: str, headers: dict) -> dict:
+        full = {"q": q, "count": 20, "country": "CO", "search_lang": "es", "freshness": self.freshness}
+        # Si el plan no acepta algún filtro (error 422), se reintenta solo con lo básico.
+        for params in (full, {"q": q, "count": 20}):
+            try:
+                return self.http.get(API_URL, headers=headers, params=params).json()
+            except requests.HTTPError as exc:
+                body = exc.response.text[:300] if exc.response is not None else ""
+                if exc.response is None or exc.response.status_code != 422 or params is not full:
+                    raise RuntimeError(f"Brave respondió {exc}: {body}") from exc
+                log.warning("%s: Brave rechazó los filtros (%s); se reintenta sin ellos", self.name, body)
+        return {}
 
     def enrich(self, job: Job) -> None:
         """Añade a la descripción el texto de la imagen de la publicación."""

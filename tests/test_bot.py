@@ -466,3 +466,40 @@ def test_ocr_without_tesseract_returns_empty(monkeypatch):
         raise pytesseract.TesseractNotFoundError()
     monkeypatch.setattr(pytesseract, "image_to_string", boom)
     assert ocr_image(_image_bytes(["hola"])) == ""
+
+
+def test_international_remote_jobs_need_it_title():
+    flt = make_filter()
+    desc = "We use SQL, Python and AWS daily. Linux servers and Docker. " * 6
+    assert not flt.accept(_remote("Risk Analyst", "Worldwide", desc))
+    assert not flt.accept(_remote("Customer Support Consultant hospitality", "Worldwide", desc))
+    assert not flt.accept(_remote("Norwegian Tech Linguistic Tester", "Anywhere", desc))
+    assert flt.accept(_remote("Infrastructure Engineer", "LATAM", desc))
+    assert flt.accept(_remote("Senior Backend Engineer", "Worldwide", desc))
+
+
+def test_brave_retries_without_filters_on_422(monkeypatch):
+    import requests
+
+    calls = []
+
+    class Resp:
+        def __init__(self, status, payload):
+            self.status_code, self._payload, self.text = status, payload, '{"error":"invalid"}'
+
+        def json(self):
+            return self._payload
+
+    class FakeHttp:
+        def get(self, url, headers=None, params=None):
+            calls.append(params)
+            if "country" in params:
+                raise requests.HTTPError("422", response=Resp(422, {}))
+            return Resp(200, BRAVE)
+
+    monkeypatch.setenv("BRAVE_API_KEY", "k")
+    src = _post_source()
+    src.http = FakeHttp()
+    src.queries = ["site:linkedin.com/posts vacante sistemas"]
+    jobs = src.search("")
+    assert len(jobs) == 1 and len(calls) == 2 and "country" not in calls[1]
