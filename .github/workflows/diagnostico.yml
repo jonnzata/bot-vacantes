@@ -2,6 +2,11 @@ name: Diagnóstico de fuentes
 
 on:
   workflow_dispatch:
+    inputs:
+      correo_prueba:
+        description: "Enviar a tu correo una prueba del correo de postulación (con la HV)"
+        type: boolean
+        default: false
 
 jobs:
   diagnostico:
@@ -24,3 +29,16 @@ jobs:
           LINKEDIN_IMAP_PASSWORD: ${{ secrets.LINKEDIN_IMAP_PASSWORD }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: python herramientas/diagnostico.py
+      - name: Correo de prueba de postulación (solo a tu correo)
+        if: ${{ inputs.correo_prueba }}
+        env:
+          CV_GPG_PASSPHRASE: ${{ secrets.CV_GPG_PASSPHRASE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          NOMBRE_REMITENTE: ${{ secrets.NOMBRE_REMITENTE }}
+          FIRMA_CORREO: ${{ secrets.FIRMA_CORREO }}
+        run: |
+          gpg --quiet --batch --yes --pinentry-mode loopback --passphrase "$CV_GPG_PASSPHRASE" \
+              --output cv/hoja_de_vida.pdf --decrypt cv/hoja_de_vida.pdf.gpg
+          python herramientas/probar_postulacion.py
