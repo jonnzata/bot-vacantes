@@ -4,6 +4,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
+# Las postulaciones se recuerdan más tiempo que las vacantes vistas.
+LONG_PREFIXES = ("postulada",)
+LONG_DAYS = 365
+
+
 class SeenStore:
     def __init__(self, path: Path, keep_days: int = 90):
         self.path = path
@@ -30,7 +35,9 @@ class SeenStore:
         self.add(f"fuente:{source}")
 
     def save(self) -> None:
-        limit = datetime.now(timezone.utc) - timedelta(days=self.keep_days)
-        self.data = {k: v for k, v in self.data.items() if datetime.fromisoformat(v) >= limit}
+        now = datetime.now(timezone.utc)
+        limit, long_limit = now - timedelta(days=self.keep_days), now - timedelta(days=LONG_DAYS)
+        self.data = {k: v for k, v in self.data.items()
+                     if datetime.fromisoformat(v) >= (long_limit if k.startswith(LONG_PREFIXES) else limit)}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.data, indent=0))

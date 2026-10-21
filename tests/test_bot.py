@@ -574,6 +574,9 @@ def _fake_sent_folder(already):
         def contains(self, addr, days):
             return addr in already
 
+        def contains_vacancy(self, subject, company, days):
+            return (subject, company) in already
+
         def close(self):
             pass
     return FakeSent
@@ -763,3 +766,87 @@ def test_linkedin_posts_are_never_auto_applied():
     post.description += " [Texto de la imagen] rrhh@acme.co"
     post.extract_emails()
     assert post.emails and linkedin_id(post) is None
+
+
+# --- Memoria: no postularse dos veces a la misma vacante ---------------------------
+def _job_with(title, company, email, jid):
+    return Job(title=title, url=f"https://www.linkedin.com/jobs/view/{jid}/", source="alertas_linkedin (linkedin)",
+               company=company, description=f"Medellín. Envía tu HV a {email}", enriched=True)
+
+
+def test_vacancy_key_normalizes_company_and_title():
+    from bot.autopostular import AutoPostulador as AP
+    a = Job(title="Ingeniero de Redes ", url="u", source="s", company="ACME Redes S.A.S.")
+    b = Job(title="ingeniero de redes", url="u", source="s", company="Acme Redes SAS")
+    assert AP.vacancy_key(a) == AP.vacancy_key(b) != ""
+    assert AP.vacancy_key(Job(title="Ingeniero de Redes", url="u", source="s")) == ""  # sin empresa
+
+
+def test_republished_vacancy_with_other_email_is_not_sent_twice(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    ap = _postulador(tmp_path)
+    original = _linkedin_job()
+    assert len(ap.run([original])) == 1
+    ap.seen.save()
+    from bot.storage import SeenStore
+    ap2 = _postulador(tmp_path, html="")
+    ap2.seen = SeenStore(tmp_path / "seen.json")
+    # Republicada: otro id de LinkedIn y otra persona de contacto
+    again = _job_with("Ingeniero de Redes", "Acme Redes SAS", "otra.persona@acmeredes.co", 4077777777)
+    monkeypatch.setattr(ap2, "enrich", lambda job: (job.extract_emails(), True)[1])
+    assert ap2.run([again]) == []
+    assert len(_FakeSMTP.sent) == 2  # solo el primer envío y su resumen
+
+
+def test_same_vacancy_twice_in_one_run(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    ap = _postulador(tmp_path)
+    monkeypatch.setattr(ap, "enrich", lambda job: (job.extract_emails(), True)[1])
+    a = _job_with("Analista NOC", "Redes XYZ", "a@redesxyz.co", 4011111111)
+    b = _job_with("Analista NOC", "Redes XYZ", "b@redesxyz.co", 4022222222)
+    assert len(ap.run([a, b])) == 1
+
+
+def test_vacancy_found_in_gmail_sent_by_subject(tmp_path, monkeypatch):
+    ap = _postulador(tmp_path)
+    job = _linkedin_job()
+    assert ap.enrich(job)
+    _smtp_env(monkeypatch, already={(ap.subject_for(job), job.company)})
+    ap = _postulador(tmp_path)
+    assert ap.run([_linkedin_job()]) == []
+    assert _FakeSMTP.sent == []
+
+
+def test_applications_are_remembered_for_a_year(tmp_path):
+    import json
+    from datetime import datetime, timedelta, timezone
+    from bot.storage import SeenStore
+    old = (datetime.now(timezone.utc) - timedelta(days=200)).isoformat(timespec="seconds")
+    path = tmp_path / "seen.json"
+    path.write_text(json.dumps({"postulada_correo:a@b.co": old, "postulada_vacante:x|y": old, "abc123": old}))
+    store = SeenStore(path)
+    store.save()
+    assert "postulada_correo:a@b.co" in store and "postulada_vacante:x|y" in store
+    assert "abc123" not in store  # las vacantes vistas sí se olvidan a los 90 días
+
+
+def test_sent_folder_contains_vacancy(monkeypatch):
+    import bot.autopostular as mod
+
+    class FakeImap:
+        literal = None
+        def __init__(self, host): pass
+        def login(self, *a): pass
+        def list(self): return "OK", [b'(\\Sent) "/" "[Gmail]/Enviados"']
+        def select(self, name, readonly): return "OK", [b"1"]
+        def search(self, charset, *crit):
+            ok = self.literal == "Postulación – Analista TI".encode()
+            return "OK", [b"5" if ok else b""]
+        def fetch(self, msg_id, what):
+            return "OK", [(b"5", "Buen día, equipo de selección de Acme Redes SAS".encode())]
+        def logout(self): pass
+    monkeypatch.setattr(mod.imaplib, "IMAP4_SSL", FakeImap)
+    folder = mod.SentFolder("h", "u", "p")
+    assert folder.contains_vacancy("Postulación – Analista TI", "Acme Redes SAS", 365)
+    assert not folder.contains_vacancy("Postulación – Analista TI", "Otra Empresa", 365)
+    assert not folder.contains_vacancy("Postulación – Otro cargo", "Acme Redes SAS", 365)

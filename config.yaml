@@ -396,7 +396,7 @@ autopostulacion:
   max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
   # Memoria: nunca se escribe dos veces al mismo correo. Además del registro del
   # bot, antes de enviar revisa tu carpeta de Enviados de Gmail de los últimos N días.
-  revisar_enviados_dias: 120
+  revisar_enviados_dias: 365   # también por vacante (asunto + empresa), no solo por correo
 
   # Tu perfil (sacado de tu hoja de vida). La HV solo se envía si la vacante
   # CUMPLE con él; si no, se omite y queda registrado el motivo en el log.
