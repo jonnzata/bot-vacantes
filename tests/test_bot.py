@@ -857,3 +857,19 @@ def test_sent_folder_contains_vacancy(monkeypatch):
     assert folder.contains_vacancy("Postulación – Analista TI", "Acme Redes SAS", 365)
     assert not folder.contains_vacancy("Postulación – Analista TI", "Otra Empresa", 365)
     assert not folder.contains_vacancy("Postulación – Otro cargo", "Acme Redes SAS", 365)
+
+
+def test_email_text_formats_skills_and_attachment(tmp_path, monkeypatch):
+    from bot.autopostular import skills_text
+    assert skills_text(["fortigate", "firewall", "firewalls", "vpn", "redes", "lan", "wan"]) == \
+        "FortiGate, firewall, VPN, redes y LAN/WAN"
+    assert skills_text(["python"]) == "Python" and skills_text([]) == ""
+    monkeypatch.setenv("NOMBRE_REMITENTE", "Jonny Alberto Zapata Taborda")
+    ap = _postulador(tmp_path)
+    job = _linkedin_job()
+    job.company, job.matched_skills = "Acme Redes SAS", ["fortigate", "vpn", "lan", "wan"]
+    body = ap.body_for(job)
+    assert "vacante de Ingeniero de Redes publicada en LinkedIn." in body
+    assert "lo que solicitan: FortiGate, VPN y LAN/WAN." in body
+    assert ap.attachment_name() == "HV Jonny Alberto Zapata Taborda.pdf"
+    assert 'filename="HV Jonny Alberto Zapata Taborda.pdf"' in ap.build_message(job, ["a@b.co"]).as_string()

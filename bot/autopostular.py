@@ -37,15 +37,45 @@ _BAD_DOMAINS = ("linkedin.com", "licdn.com", "indeed.com", "computrabajo.com", "
 
 DEFAULT_BODY = """Buen día, equipo de selección{empresa_de}:
 
-Me permito postularme a la vacante de {cargo}. Adjunto mi hoja de vida.
+Me permito postularme a la vacante de {cargo}{publicada}. Adjunto mi hoja de vida.
 
 Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y ciberseguridad: administración de firewalls FortiGate y FortiManager en entornos multisede, monitoreo de redes con Zabbix y SNMP, implementación de SIEM (Wazuh) alineado a ISO 27001, administración multinube (Azure y GCP) y automatización con Python y Docker.
 
-{coincidencias}Quedo atento a la posibilidad de una entrevista.
+{coincidencias}Quedo atento a sus comentarios y a la posibilidad de una entrevista.
 
 Cordialmente,
 
 {firma}"""
+
+
+# Cómo se escriben las habilidades en el correo (en config.yaml van sin tildes ni
+# mayúsculas para poder buscarlas). Las que no están aquí se dejan como vienen.
+SKILL_NAMES = {
+    "fortigate": "FortiGate", "fortinet": "Fortinet", "fortimanager": "FortiManager", "vpn": "VPN",
+    "lan": "LAN", "wan": "WAN", "tcp/ip": "TCP/IP", "snmp": "SNMP", "zabbix": "Zabbix", "wazuh": "Wazuh",
+    "siem": "SIEM", "iso 27001": "ISO 27001", "drp": "DRP", "bcp": "BCP", "nmap": "Nmap", "azure": "Azure",
+    "gcp": "GCP", "google cloud": "Google Cloud", "docker": "Docker", "docker compose": "Docker Compose",
+    "linux": "Linux", "windows server": "Windows Server", "active directory": "Active Directory",
+    "python": "Python", "ci/cd": "CI/CD", "sql": "SQL", "power bi": "Power BI", "glpi": "GLPI", "itil": "ITIL",
+    "voip": "VoIP", "issabel": "Issabel", "aruba": "Aruba", "ubiquiti": "Ubiquiti", "unifi": "UniFi",
+    "bitdefender": "Bitdefender", "soporte n2": "soporte N2", "soporte n3": "soporte N3",
+    "automatizacion": "automatización", "mesa de servicio": "mesa de servicio", "cisco": "Cisco",
+}
+
+
+def skills_text(skills) -> str:
+    """["fortigate", "firewalls", "vpn", "lan", "wan"] → "FortiGate, firewalls, VPN y LAN/WAN"."""
+    names, seen = [], set()
+    for s in skills:
+        base = s[:-1] if s.endswith("s") and s[:-1] in seen else s  # firewall / firewalls
+        if base in seen:
+            continue
+        seen.add(base)
+        names.append(SKILL_NAMES.get(s, s))
+    if "LAN" in names and "WAN" in names:
+        names[names.index("LAN")] = "LAN/WAN"
+        names.remove("WAN")
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} y {names[-1]}" if names else ""
 
 
 _YEARS_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:anos|years?)\b(?:\s+o\s+mas)?\s+(?:de\s+|of\s+)?(?:experiencia|experience)")
@@ -230,14 +260,20 @@ class AutoPostulador:
         return f"Postulación – {job.title}"
 
     def body_for(self, job) -> str:
-        skills = ", ".join(job.matched_skills[:6])
+        skills = skills_text(job.matched_skills[:6])
         return self.body_tpl.format(
             cargo=job.title,
             empresa=job.company,
             empresa_de=f" de {job.company}" if job.company else "",
-            coincidencias=(f"Mi experiencia coincide con lo que buscan en: {skills}.\n\n" if skills else ""),
+            publicada=" publicada en LinkedIn" if "linkedin" in job.url else "",
+            coincidencias=(f"En particular, tengo experiencia en lo que solicitan: {skills}.\n\n" if skills else ""),
             firma=self.signature,
         )
+
+    def attachment_name(self) -> str:
+        """"HV Nombre Apellido.pdf" (más fácil de encontrar para el reclutador)."""
+        name = re.sub(r"[^\w .-]+", "", self.sender_name).strip()
+        return f"HV {name}.pdf" if name else self.cv_path.name
 
     # --- envío ------------------------------------------------------------------------
     def sent_today(self) -> int:
@@ -261,7 +297,7 @@ class AutoPostulador:
         msg["Message-ID"] = make_msgid()
         msg.attach(MIMEText(self.body_for(job), "plain", "utf-8"))
         pdf = MIMEApplication(self.cv_path.read_bytes(), _subtype="pdf")
-        pdf.add_header("Content-Disposition", "attachment", filename=self.cv_path.name)
+        pdf.add_header("Content-Disposition", "attachment", filename=self.attachment_name())
         msg.attach(pdf)
         return msg
 
