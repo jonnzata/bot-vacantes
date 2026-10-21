@@ -386,3 +386,83 @@ def test_linkedin_mailbox_is_optional(monkeypatch):
     assert (src.user, src.password) == ("otro@gmail.com", "y")
     jobs = src.parse_alert(LINKEDIN_ALERT, src.senders[0])
     assert jobs[0].url == "https://www.linkedin.com/jobs/view/4011223344/"
+
+
+# --- Publicaciones de LinkedIn ---------------------------------------------------
+import shutil  # noqa: E402
+
+import pytest  # noqa: E402
+
+from bot.sources.social_posts import LinkedInPostsSource, ocr_image  # noqa: E402
+
+BRAVE = {"web": {"results": [
+    {"title": "Ana Gómez en LinkedIn: #vacante #empleo Buscamos Técnico en sistemas",
+     "url": "https://www.linkedin.com/posts/ana-gomez_vacante-empleo-activity-7111?utm_source=x",
+     "description": "Buscamos <strong>Técnico en sistemas</strong> para Medellín. Soporte técnico a usuarios.",
+     "page_age": "2026-10-20T10:00:00", "thumbnail": {"original": "https://media.licdn.com/img.jpg"}},
+    {"title": "Ofertas | LinkedIn", "url": "https://www.linkedin.com/jobs/search?keywords=x",
+     "description": "listado"},  # no es una publicación
+]}}
+
+
+def _post_source():
+    cfg = next(f for f in CONFIG["fuentes"] if f["tipo"] == "publicaciones")
+    return LinkedInPostsSource(cfg, http=None)
+
+
+def test_linkedin_posts_parse():
+    jobs = _post_source().parse(BRAVE)
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.title == "#vacante #empleo Buscamos Técnico en sistemas"
+    assert job.url == "https://www.linkedin.com/posts/ana-gomez_vacante-empleo-activity-7111"
+    assert job.published == "2026-10-20" and job._image == "https://media.licdn.com/img.jpg"
+    assert make_filter().accept(job)  # Medellín viene en el texto, no en un campo
+
+
+def test_linkedin_posts_without_key_are_skipped(monkeypatch):
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    assert _post_source().search("") == []
+
+
+def _image_bytes(lines):
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.new("RGB", (1400, 120 * len(lines) + 80), "white")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default(size=64)
+    for i, line in enumerate(lines):
+        draw.text((40, 40 + 120 * i), line, fill="black", font=font)
+    buf = __import__("io").BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.mark.skipif(not shutil.which("tesseract"), reason="Tesseract no instalado")
+def test_vacancy_published_as_image_is_read_with_ocr():
+    png = _image_bytes(["VACANTE", "Analista de soporte TI", "Medellin - presencial", "Envia tu HV a", "rrhh@acme.co"])
+
+    class FakeHttp:
+        def get(self, url):
+            return type("R", (), {"content": png})()
+
+    src = _post_source()
+    src.http = FakeHttp()
+    job = Job(title="Juan Pérez: ¡Estamos contratando! 🚀", url="https://www.linkedin.com/posts/x", source="t",
+              description="¡Estamos contratando! Postúlate 👇")
+    job._image = "https://media.licdn.com/img.png"
+    flt = make_filter()
+    assert not flt.accept(job)  # sin la imagen no hay datos para saber que es de sistemas
+    src.enrich(job)
+    job.extract_emails()
+    assert "soporte" in job.description.lower()
+    assert flt.accept(job)
+    assert any(m.endswith("acme.co") for m in job.emails)
+    assert "verifícalo" in job_to_text(job)
+
+
+def test_ocr_without_tesseract_returns_empty(monkeypatch):
+    import pytesseract
+    def boom(*a, **k):
+        raise pytesseract.TesseractNotFoundError()
+    monkeypatch.setattr(pytesseract, "image_to_string", boom)
+    assert ocr_image(_image_bytes(["hola"])) == ""

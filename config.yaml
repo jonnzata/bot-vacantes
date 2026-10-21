@@ -449,6 +449,25 @@ fuentes:
         enlace_regex: 'https?://(?:[a-z]+\.)?linkedin\.com/(?:comm/)?jobs/view/(\d+)'
         url_id: https://www.linkedin.com/jobs/view/{id}/
 
+  # Publicaciones de personas en LinkedIn ("estamos contratando", "#vacante"),
+  # encontradas con la API de Brave Search (secret BRAVE_API_KEY; sin él se
+  # omite). Si la publicación trae un diseño en imagen, se lee con OCR.
+  # Plan gratuito ~2.000 consultas/mes: 8 consultas cada 6 h ≈ 960/mes.
+  - nombre: linkedin_publicaciones
+    tipo: publicaciones
+    activa: true
+    cada_horas: 6
+    frescura: pw            # pd = último día, pw = última semana, pm = último mes
+    consultas:
+      - site:linkedin.com/posts vacante sistemas Medellín
+      - site:linkedin.com/posts vacante "soporte técnico" Medellín
+      - site:linkedin.com/posts "estamos contratando" desarrollador Medellín
+      - site:linkedin.com/posts vacante "ingeniero de sistemas" Antioquia
+      - site:linkedin.com/posts vacante redes infraestructura Medellín
+      - site:linkedin.com/posts vacante ciberseguridad Colombia remoto
+      - site:linkedin.com/posts vacante teletrabajo sistemas Colombia
+      - site:linkedin.com/posts "#empleo" tecnología Medellín
+
   # --- Teletrabajo en Colombia (cualquier ciudad) ---
   # El filtro solo deja las que dicen remoto/teletrabajo y no son híbridas.
   - nombre: computrabajo_remoto

@@ -30,6 +30,9 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # OCR para leer las vacantes publicadas como imagen en LinkedIn
+      - run: sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-spa > /dev/null
+
       # Memoria de vacantes ya enviadas (para no repetirlas entre ejecuciones)
       - name: Restaurar vacantes vistas
         uses: actions/cache/restore@v4
@@ -49,6 +52,7 @@ jobs:
           CV_TEXT: ${{ secrets.CV_TEXT }}
           LINKEDIN_IMAP_USER: ${{ secrets.LINKEDIN_IMAP_USER }}
           LINKEDIN_IMAP_PASSWORD: ${{ secrets.LINKEDIN_IMAP_PASSWORD }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: python -m bot.main
 
       - name: Guardar vacantes vistas

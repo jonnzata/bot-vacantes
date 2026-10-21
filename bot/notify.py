@@ -12,6 +12,11 @@ import requests
 log = logging.getLogger(__name__)
 
 
+def _ocr_note(job) -> str:
+    # Los correos leídos de una imagen pueden traer letras cambiadas.
+    return " (leído de la imagen: verifícalo en la publicación)" if "[Texto de la imagen]" in job.description else ""
+
+
 def job_to_text(job) -> str:
     lines = [f"💼 {job.title}"]
     if job.company:
@@ -26,7 +31,7 @@ def job_to_text(job) -> str:
         lines.append(f"✅ Coincide con tu HV: {', '.join(job.matched_skills[:8])}")
     lines.append(f"🔗 Postúlate: {job.link}")
     if job.emails:
-        lines.append(f"✉️ Enviar HV a: {', '.join(job.emails)}")
+        lines.append(f"✉️ Enviar HV a: {', '.join(job.emails)}{_ocr_note(job)}")
     lines.append(f"Fuente: {job.source}")
     return "\n".join(lines)
 
@@ -46,7 +51,7 @@ def job_to_html(job) -> str:
         rows.append(f"✅ Coincide con tu HV: {e(', '.join(job.matched_skills[:8]))}")
     if job.emails:
         mails = ", ".join(f'<a href="mailto:{e(m)}">{e(m)}</a>' for m in job.emails)
-        rows.append(f"✉️ Enviar HV a: {mails}")
+        rows.append(f"✉️ Enviar HV a: {mails}{e(_ocr_note(job))}")
     snippet = e(job.description[:350]) + ("…" if len(job.description) > 350 else "")
     return (
         '<div style="border:1px solid #ddd;border-radius:8px;padding:12px;margin:12px 0">'

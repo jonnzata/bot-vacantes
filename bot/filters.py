@@ -37,7 +37,7 @@ class JobFilter:
 
     def in_antioquia(self, job: Job) -> bool:
         # Se prioriza el campo de ubicación; solo si está vacío se mira el texto.
-        where = normalize(job.location) or normalize(job.description[:600])
+        where = normalize(job.location) or normalize(job.description[:1500])
         if matched_terms(where, self.towns):
             return True
         return self.allow_remote and self.remote_ok(job)

@@ -187,8 +187,40 @@ def _contar_linkedin(user, pwd):
                 print(f"  {n:4}  {addr}")
 
 
+def probar_publicaciones():
+    """Busca publicaciones de LinkedIn con Brave y prueba el OCR de sus imágenes."""
+    if not os.environ.get("BRAVE_API_KEY"):
+        print("\n(sin BRAVE_API_KEY: no se prueban las publicaciones de LinkedIn)")
+        return
+    import yaml
+    from bot.filters import JobFilter
+    from bot.sources.social_posts import LinkedInPostsSource
+
+    config = yaml.safe_load((Path(__file__).resolve().parent.parent / "config.yaml").read_text(encoding="utf-8"))
+    cfg = next(f for f in config["fuentes"] if f.get("tipo") == "publicaciones")
+    cfg = {**cfg, "consultas": cfg["consultas"][:2]}  # pocas, para no gastar cupo
+    src = LinkedInPostsSource(cfg, Http(pause=1.1))
+    flt = JobFilter(config, [])
+    print("\n=== publicaciones de LinkedIn ===")
+    try:
+        jobs = src.search("")
+    except Exception as exc:
+        print(f"ERR  {exc!r}")
+        return
+    print(f"publicaciones={len(jobs)} con_imagen={sum(1 for j in jobs if j._image)}")
+    for j in jobs[:6]:
+        antes = len(j.description)
+        try:
+            src.enrich(j)
+        except Exception as exc:
+            print(f"  ERR imagen: {exc!r}")
+        print(f"  [{flt.reject_reason(j) or 'ACEPTADA'}] {j.title[:70]!r} | texto={antes} "
+              f"ocr={len(j.description) - antes} | {j.url[:80]}")
+
+
 if __name__ == "__main__":
     probar_remotos()
+    probar_publicaciones()
     probar_urls()
     resumir_correos()
     remitentes_linkedin()

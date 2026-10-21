@@ -13,10 +13,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+
+      # OCR para leer las vacantes publicadas como imagen en LinkedIn
+      - run: sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-spa > /dev/null
       - name: Probar fuentes
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           LINKEDIN_IMAP_USER: ${{ secrets.LINKEDIN_IMAP_USER }}
           LINKEDIN_IMAP_PASSWORD: ${{ secrets.LINKEDIN_IMAP_PASSWORD }}
+          BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}
         run: python herramientas/diagnostico.py
