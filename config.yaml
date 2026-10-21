@@ -462,10 +462,9 @@ fuentes:
     tipo: publicaciones
     activa: true
     cada_horas: 6
-    # pd = último día, pw = última semana, pm = último mes. Con "pw" casi no hay
-    # resultados; las publicaciones viejas las descarta `dias_maximos` (la fecha
-    # se saca del id del enlace).
-    frescura: pm
+    # Sin filtro de fecha: con él, Brave no devuelve publicaciones de LinkedIn.
+    # Las antiguas las descarta `dias_maximos` (la fecha sale del id del enlace).
+    frescura:
     consultas:
       - site:linkedin.com/posts vacante sistemas Medellín
       - site:linkedin.com/posts vacante "soporte técnico" Medellín

@@ -213,14 +213,15 @@ def probar_publicaciones():
     except Exception as exc:
         print(f"ERR  {exc!r}")
         return
-    print(f"publicaciones={len(jobs)} con_imagen={sum(1 for j in jobs if j._image)}")
-    for j in jobs[:6]:
+    recientes = [j for j in jobs if flt.is_recent(j)]
+    print(f"publicaciones={len(jobs)} recientes={len(recientes)} con_imagen={sum(1 for j in jobs if j._image)}")
+    for j in (recientes or jobs)[:8]:
         antes = len(j.description)
         try:
             src.enrich(j)
         except Exception as exc:
             print(f"  ERR imagen: {exc!r}")
-        print(f"  [{flt.reject_reason(j) or 'ACEPTADA'}] {j.title[:70]!r} | texto={antes} "
+        print(f"  [{flt.reject_reason(j) or 'ACEPTADA'}] {j.published or '¿fecha?'} {j.title[:70]!r} | texto={antes} "
               f"ocr={len(j.description) - antes} | {j.url[:80]}")
 
 

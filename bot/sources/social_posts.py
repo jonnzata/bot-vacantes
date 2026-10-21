@@ -70,7 +70,7 @@ class LinkedInPostsSource:
     def __init__(self, cfg: dict, http):
         self.name = cfg["nombre"]
         self.queries = cfg.get("consultas", [])
-        self.freshness = cfg.get("frescura", "pw")  # pd=día, pw=semana, pm=mes
+        self.freshness = cfg.get("frescura")  # pd/pw/pm; vacío = sin filtro de fecha
         self.interval_hours = cfg.get("cada_horas", 0)
         self.use_ocr = cfg.get("ocr", True)
         self.key = os.environ.get("BRAVE_API_KEY", "")
@@ -114,10 +114,14 @@ class LinkedInPostsSource:
         return jobs
 
     def _query(self, q: str, headers: dict) -> dict:
-        # Brave no admite country=CO; el idioma y la fecha sí.
-        full = {"q": q, "count": 20, "search_lang": "es", "freshness": self.freshness}
+        # Brave no admite country=CO, y con filtros de idioma o fecha casi no devuelve
+        # publicaciones de LinkedIn (no traen fecha en sus metadatos): las antiguas
+        # se descartan después con la fecha sacada del id del enlace.
+        full = {"q": q, "count": 20}
+        if self.freshness:
+            full["freshness"] = self.freshness
         # Si el plan no acepta algún filtro (error 422), se reintenta solo con lo básico.
-        for params in (full, {"q": q, "count": 20}):
+        for params in ((full, {"q": q, "count": 20}) if len(full) > 2 else (full,)):
             try:
                 return self.http.get(API_URL, headers=headers, params=params).json()
             except requests.HTTPError as exc:

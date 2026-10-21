@@ -495,10 +495,13 @@ def test_brave_retries_without_filters_on_422(monkeypatch):
             calls.append(params)
             if "freshness" in params:
                 raise requests.HTTPError("422", response=Resp(422, {}))
+            assert set(params) == {"q", "count"}
             return Resp(200, BRAVE)
 
     monkeypatch.setenv("BRAVE_API_KEY", "k")
     src = _post_source()
+    assert not src.freshness  # por defecto, sin filtro de fecha
+    src.freshness = "pw"
     src.http = FakeHttp()
     src.queries = ["site:linkedin.com/posts vacante sistemas"]
     jobs = src.search("")
