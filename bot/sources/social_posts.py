@@ -9,6 +9,7 @@ import io
 import logging
 import os
 import re
+from urllib.parse import unquote
 
 import requests
 
@@ -46,6 +47,14 @@ def ocr_image(data: bytes) -> str:
     return re.sub(r"\s+", " ", " | ".join(texts)).strip()
 
 
+def _slug_words(url: str) -> str:
+    """Palabras del enlace (".../posts/empresa_vacante-sistemas-medellin-activity-71...")
+    que suelen traer el cargo, los hashtags y la ciudad que el resumen corta."""
+    slug = unquote(url.split("?")[0].rstrip("/").rsplit("/", 1)[-1])
+    slug = re.sub(r"-?(?:activity|ugcPost|share)-\d+.*$", "", slug)
+    return re.sub(r"[-_]+", " ", slug).strip()
+
+
 class LinkedInPostsSource:
     def __init__(self, cfg: dict, http):
         self.name = cfg["nombre"]
@@ -64,9 +73,14 @@ class LinkedInPostsSource:
             if not POST_RE.match(url):
                 continue
             title = _TITLE_NOISE.sub("", html_to_text(r.get("title", ""))).strip()
+            slug = _slug_words(url)
+            # El título de una publicación suele ser genérico ("¡Únete al equipo!"):
+            # se le añaden los hashtags/palabras del enlace, que traen el cargo.
+            if slug and slug.lower() not in title.lower():
+                title = f"{title} · {slug}" if title else slug
             text = " ".join([html_to_text(r.get("description", ""))] +
                             [html_to_text(s) for s in r.get("extra_snippets") or []])
-            job = Job(title=title[:140] or text[:140], url=url.split("?")[0], source=self.name,
+            job = Job(title=title[:160] or text[:160], url=url.split("?")[0], source=self.name,
                       description=text, published=str(r.get("page_age") or "")[:10])
             thumb = r.get("thumbnail") or {}
             job._image = thumb.get("original") or thumb.get("src") or ""
@@ -89,7 +103,8 @@ class LinkedInPostsSource:
         return jobs
 
     def _query(self, q: str, headers: dict) -> dict:
-        full = {"q": q, "count": 20, "country": "CO", "search_lang": "es", "freshness": self.freshness}
+        # Brave no admite country=CO; el idioma y la fecha sí.
+        full = {"q": q, "count": 20, "search_lang": "es", "freshness": self.freshness}
         # Si el plan no acepta algún filtro (error 422), se reintenta solo con lo básico.
         for params in (full, {"q": q, "count": 20}):
             try:
@@ -104,10 +119,15 @@ class LinkedInPostsSource:
     def enrich(self, job: Job) -> None:
         """Añade a la descripción el texto de la imagen de la publicación."""
         image = getattr(job, "_image", "")
-        if self.use_ocr and image:
+        job.enriched = True  # aunque falle la imagen, el texto de la publicación sirve
+        if not (self.use_ocr and image):
+            return
+        try:
             resp = self.http.get(image)
-            if len(resp.content) <= MAX_IMAGE_BYTES:
-                text = ocr_image(resp.content)
-                if text:
-                    job.description = f"{job.description}\n{IMAGE_MARK} {text}"
-        job.enriched = True
+        except Exception as exc:  # enlaces de imagen caducados, 400/403 del CDN...
+            log.debug("No se pudo descargar la imagen de %s: %s", job.url, exc)
+            return
+        if len(resp.content) <= MAX_IMAGE_BYTES:
+            text = ocr_image(resp.content)
+            if text:
+                job.description = f"{job.description}\n{IMAGE_MARK} {text}"

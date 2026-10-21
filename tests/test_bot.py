@@ -414,7 +414,7 @@ def test_linkedin_posts_parse():
     jobs = _post_source().parse(BRAVE)
     assert len(jobs) == 1
     job = jobs[0]
-    assert job.title == "#vacante #empleo Buscamos Técnico en sistemas"
+    assert job.title == "#vacante #empleo Buscamos Técnico en sistemas · ana gomez vacante empleo"
     assert job.url == "https://www.linkedin.com/posts/ana-gomez_vacante-empleo-activity-7111"
     assert job.published == "2026-10-20" and job._image == "https://media.licdn.com/img.jpg"
     assert make_filter().accept(job)  # Medellín viene en el texto, no en un campo
@@ -493,7 +493,7 @@ def test_brave_retries_without_filters_on_422(monkeypatch):
     class FakeHttp:
         def get(self, url, headers=None, params=None):
             calls.append(params)
-            if "country" in params:
+            if "freshness" in params:
                 raise requests.HTTPError("422", response=Resp(422, {}))
             return Resp(200, BRAVE)
 
@@ -502,4 +502,24 @@ def test_brave_retries_without_filters_on_422(monkeypatch):
     src.http = FakeHttp()
     src.queries = ["site:linkedin.com/posts vacante sistemas"]
     jobs = src.search("")
-    assert len(jobs) == 1 and len(calls) == 2 and "country" not in calls[1]
+    assert len(jobs) == 1 and len(calls) == 2 and "freshness" not in calls[1]
+    assert "country" not in calls[0]  # Brave no admite Colombia como país
+
+
+def test_linkedin_post_uses_url_words_and_survives_bad_image():
+    payload = {"web": {"results": [{
+        "title": "Empresa XYZ en LinkedIn: ¡Únete a nuestro equipo!",
+        "url": "https://co.linkedin.com/posts/empresa-xyz_vacante-ingeniero-de-sistemas-medellin-activity-7123456",
+        "description": "¡Únete a nuestro equipo! Postúlate ya.",
+        "thumbnail": {"original": "https://media.licdn.com/caducada.jpg"}}]}}
+    src = _post_source()
+    job = src.parse(payload)[0]
+    assert job.title == "¡Únete a nuestro equipo! · empresa xyz vacante ingeniero de sistemas medellin"
+
+    class BrokenHttp:
+        def get(self, url):
+            raise RuntimeError("400 Bad Request")
+
+    src.http = BrokenHttp()
+    src.enrich(job)  # no debe fallar
+    assert job.enriched and make_filter().accept(job)
