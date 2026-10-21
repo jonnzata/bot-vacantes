@@ -523,3 +523,14 @@ def test_linkedin_post_uses_url_words_and_survives_bad_image():
     src.http = BrokenHttp()
     src.enrich(job)  # no debe fallar
     assert job.enriched and make_filter().accept(job)
+
+
+def test_linkedin_post_date_from_activity_id():
+    from bot.sources.social_posts import post_date
+    # 7123456789012345678 >> 22 = 1698364445927 ms → 26-oct-2023
+    assert post_date("https://www.linkedin.com/posts/x_vacante-activity-7123456789012345678-AbCd") == "2023-10-26"
+    assert post_date("https://www.linkedin.com/feed/update/urn:li:activity:7123456789012345678/") == "2023-10-26"
+    assert post_date("https://www.linkedin.com/posts/sin-id") == ""
+    old = Job(title="Vacante ingeniero de sistemas Medellín", url="u", source="t",
+              published=post_date("https://www.linkedin.com/posts/x-activity-7123456789012345678"))
+    assert make_filter().reject_reason(old) == "antigua"

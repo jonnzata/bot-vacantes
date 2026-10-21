@@ -462,7 +462,10 @@ fuentes:
     tipo: publicaciones
     activa: true
     cada_horas: 6
-    frescura: pw            # pd = último día, pw = última semana, pm = último mes
+    # pd = último día, pw = última semana, pm = último mes. Con "pw" casi no hay
+    # resultados; las publicaciones viejas las descarta `dias_maximos` (la fecha
+    # se saca del id del enlace).
+    frescura: pm
     consultas:
       - site:linkedin.com/posts vacante sistemas Medellín
       - site:linkedin.com/posts vacante "soporte técnico" Medellín

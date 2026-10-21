@@ -9,6 +9,7 @@ import io
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from urllib.parse import unquote
 
 import requests
@@ -47,6 +48,16 @@ def ocr_image(data: bytes) -> str:
     return re.sub(r"\s+", " ", " | ".join(texts)).strip()
 
 
+def post_date(url: str) -> str:
+    """Fecha de publicación (YYYY-MM-DD) a partir del id del enlace: en LinkedIn
+    los primeros 41 bits del id ("activity-7123...") son la hora en milisegundos."""
+    m = re.search(r"(?:activity|ugcPost|share)[-:](\d{18,20})", url)
+    if not m:
+        return ""
+    ms = int(m.group(1)) >> 22
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).date().isoformat()
+
+
 def _slug_words(url: str) -> str:
     """Palabras del enlace (".../posts/empresa_vacante-sistemas-medellin-activity-71...")
     que suelen traer el cargo, los hashtags y la ciudad que el resumen corta."""
@@ -81,7 +92,7 @@ class LinkedInPostsSource:
             text = " ".join([html_to_text(r.get("description", ""))] +
                             [html_to_text(s) for s in r.get("extra_snippets") or []])
             job = Job(title=title[:160] or text[:160], url=url.split("?")[0], source=self.name,
-                      description=text, published=str(r.get("page_age") or "")[:10])
+                      description=text, published=post_date(url) or str(r.get("page_age") or "")[:10])
             thumb = r.get("thumbnail") or {}
             job._image = thumb.get("original") or thumb.get("src") or ""
             jobs.append(job)
