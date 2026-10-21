@@ -396,7 +396,7 @@ autopostulacion:
   max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
   # Memoria: nunca se escribe dos veces al mismo correo. Además del registro del
   # bot, antes de enviar revisa tu carpeta de Enviados de Gmail de los últimos N días.
-  revisar_enviados_dias: 120
+  revisar_enviados_dias: 365   # también por vacante (asunto + empresa), no solo por correo
 
   # Tu perfil (sacado de tu hoja de vida). La HV solo se envía si la vacante
   # CUMPLE con él; si no, se omite y queda registrado el motivo en el log.
@@ -537,7 +537,7 @@ autopostulacion:
     omitir_ofertas_en_ingles: true   # tu nivel de inglés es B1
   max_detalles: 30             # páginas de LinkedIn leídas por ejecución
   # mensaje: |                 # opcional: tu propio texto. Variables: {cargo} {empresa}
-  #   ...                      # {empresa_de} {coincidencias} {firma}
+  #   ...                      # {empresa_de} {publicada} {coincidencias} {firma}
 
 # --- Fuentes ---
 # remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se

@@ -37,15 +37,48 @@ _BAD_DOMAINS = ("linkedin.com", "licdn.com", "indeed.com", "computrabajo.com", "
 
 DEFAULT_BODY = """Buen día, equipo de selección{empresa_de}:
 
-Me permito postularme a la vacante de {cargo}. Adjunto mi hoja de vida.
+Me permito postularme a la vacante de {cargo}{publicada}. Adjunto mi hoja de vida.
 
 Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y ciberseguridad: administración de firewalls FortiGate y FortiManager en entornos multisede, monitoreo de redes con Zabbix y SNMP, implementación de SIEM (Wazuh) alineado a ISO 27001, administración multinube (Azure y GCP) y automatización con Python y Docker.
 
-{coincidencias}Quedo atento a la posibilidad de una entrevista.
+{coincidencias}Quedo atento a sus comentarios y a la posibilidad de una entrevista.
 
 Cordialmente,
 
 {firma}"""
+
+
+# Cómo se escriben las habilidades en el correo (en config.yaml van sin tildes ni
+# mayúsculas para poder buscarlas). Las que no están aquí se dejan como vienen.
+SKILL_NAMES = {
+    "fortigate": "FortiGate", "fortinet": "Fortinet", "fortimanager": "FortiManager", "vpn": "VPN",
+    "lan": "LAN", "wan": "WAN", "tcp/ip": "TCP/IP", "snmp": "SNMP", "zabbix": "Zabbix", "wazuh": "Wazuh",
+    "siem": "SIEM", "iso 27001": "ISO 27001", "drp": "DRP", "bcp": "BCP", "nmap": "Nmap", "azure": "Azure",
+    "gcp": "GCP", "google cloud": "Google Cloud", "docker": "Docker", "docker compose": "Docker Compose",
+    "linux": "Linux", "windows server": "Windows Server", "active directory": "Active Directory",
+    "python": "Python", "ci/cd": "CI/CD", "sql": "SQL", "power bi": "Power BI", "glpi": "GLPI", "itil": "ITIL",
+    "voip": "VoIP", "issabel": "Issabel", "aruba": "Aruba", "ubiquiti": "Ubiquiti", "unifi": "UniFi",
+    "bitdefender": "Bitdefender", "soporte n2": "soporte N2", "soporte n3": "soporte N3",
+    "automatizacion": "automatización", "mesa de servicio": "mesa de servicio", "cisco": "Cisco",
+}
+
+
+def skills_text(skills) -> str:
+    """["fortigate", "firewalls", "vpn", "lan", "wan"] → "FortiGate, firewalls, VPN y LAN/WAN"."""
+    names, seen = [], set()
+    for s in skills:
+        base = s[:-1] if s.endswith("s") and s[:-1] in seen else s  # firewall / firewalls
+        if base in seen:
+            continue
+        seen.add(base)
+        names.append(SKILL_NAMES.get(s, s))
+    if "LAN" in names and "WAN" in names:
+        names[names.index("LAN")] = "LAN/WAN"
+        names.remove("WAN")
+    if "redes" in names and "LAN/WAN" in names:
+        names[names.index("LAN/WAN")] = "redes LAN/WAN"
+        names.remove("redes")
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} y {names[-1]}" if names else ""
 
 
 _YEARS_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:anos|years?)\b(?:\s+o\s+mas)?\s+(?:de\s+|of\s+)?(?:experiencia|experience)")
@@ -209,6 +242,17 @@ class AutoPostulador:
         return True
 
     @staticmethod
+    def vacancy_key(job) -> str:
+        """Huella de la vacante (empresa + cargo), para no postularse dos veces a la
+        misma oferta aunque se republique con otro id o con otro correo de contacto.
+        Sin empresa no se calcula: el mismo cargo en otra empresa es otra vacante."""
+        company = re.sub(r"[^a-z0-9 ]+", " ", normalize(job.company))
+        company = re.sub(r"\b(s ?a ?s|s ?a|ltda|inc|llc|colombia)\b", " ", company)
+        title = re.sub(r"[^a-z0-9 ]+", " ", normalize(job.title))
+        company, title = " ".join(company.split()), " ".join(title.split())
+        return f"postulada_vacante:{company}|{title}" if company and title else ""
+
+    @staticmethod
     def clean_emails(emails) -> list:
         return [e for e in emails if not any(e.endswith(d) for d in _BAD_DOMAINS)][:2]
 
@@ -219,14 +263,20 @@ class AutoPostulador:
         return f"Postulación – {job.title}"
 
     def body_for(self, job) -> str:
-        skills = ", ".join(job.matched_skills[:6])
+        skills = skills_text(job.matched_skills[:6])
         return self.body_tpl.format(
             cargo=job.title,
             empresa=job.company,
             empresa_de=f" de {job.company}" if job.company else "",
-            coincidencias=(f"Mi experiencia coincide con lo que buscan en: {skills}.\n\n" if skills else ""),
+            publicada=" publicada en LinkedIn" if "linkedin" in job.url else "",
+            coincidencias=(f"En particular, tengo experiencia en lo que solicitan: {skills}.\n\n" if skills else ""),
             firma=self.signature,
         )
+
+    def attachment_name(self) -> str:
+        """"HV Nombre Apellido.pdf" (más fácil de encontrar para el reclutador)."""
+        name = re.sub(r"[^\w .-]+", "", self.sender_name).strip()
+        return f"HV {name}.pdf" if name else self.cv_path.name
 
     # --- envío ------------------------------------------------------------------------
     def sent_today(self) -> int:
@@ -250,7 +300,7 @@ class AutoPostulador:
         msg["Message-ID"] = make_msgid()
         msg.attach(MIMEText(self.body_for(job), "plain", "utf-8"))
         pdf = MIMEApplication(self.cv_path.read_bytes(), _subtype="pdf")
-        pdf.add_header("Content-Disposition", "attachment", filename=self.cv_path.name)
+        pdf.add_header("Content-Disposition", "attachment", filename=self.attachment_name())
         msg.attach(pdf)
         return msg
 
@@ -289,7 +339,10 @@ class AutoPostulador:
             to = self.clean_emails(job.emails)
             planned = {a for _, addrs in plan for a in addrs}
             repeated = any(self.already_applied(a) or a in planned for a in to)
+            key = self.vacancy_key(job)
+            same_vacancy = key and (key in self.seen or key in {self.vacancy_key(j) for j, _ in plan})
             reason = ("sin correo de contacto" if not to else
+                      "ya te postulaste a esta vacante" if same_vacancy else
                       "ya se envió a ese correo" if repeated else
                       "empresa excluida" if self.excluded_company(job, to) else
                       self.place_ok(job) or self.profile_ok(job))
@@ -326,6 +379,8 @@ class AutoPostulador:
                         log.warning("No se envió la HV a %s: %s", to, exc)
                         continue
                     self.seen.add(f"postulada:{job.uid}")
+                    if self.vacancy_key(job):
+                        self.seen.add(self.vacancy_key(job))
                     for addr in to:
                         self.seen.add(f"postulada_correo:{addr}")
                     done.append((job, to))
@@ -341,6 +396,12 @@ class AutoPostulador:
         return f"postulada_correo:{addr}" in self.seen
 
     def _in_sent_folder(self, job, to) -> bool:
+        if job.company and self._sent_folder().contains_vacancy(self.subject_for(job), job.company, self.sent_days):
+            log.info("No se postula [ya enviaste esa vacante, ver Enviados]: %s | %s", job.title, job.company)
+            if self.vacancy_key(job):
+                self.seen.add(self.vacancy_key(job))
+            self.seen.add(f"revisada:{job.uid}")
+            return True
         for addr in to:
             if self._sent_folder().contains(addr, self.sent_days):
                 log.info("No se postula [ya le escribiste a %s, ver Enviados]: %s", addr, job.title)
@@ -399,6 +460,22 @@ class SentFolder:
         if status != "OK":
             raise RuntimeError(f"búsqueda en Enviados falló para {addr}")
         return bool(data and data[0].split())
+
+    def contains_vacancy(self, subject: str, company: str, days: int) -> bool:
+        """¿Hay un correo enviado con ese asunto que mencione a la empresa?"""
+        since = (date.today() - timedelta(days=days)).strftime("%d-%b-%Y")
+        self.imap.literal = subject.encode("utf-8")  # el asunto puede tener tildes
+        status, data = self.imap.search("UTF-8", "SINCE", since, "SUBJECT")
+        if status != "OK":
+            raise RuntimeError("búsqueda por asunto en Enviados falló")
+        ids = data[0].split() if data and data[0] else []
+        wanted = normalize(company)
+        for msg_id in ids[-20:]:
+            _, md = self.imap.fetch(msg_id, "(BODY.PEEK[TEXT]<0.4000>)")
+            body = b" ".join(p[1] for p in md if isinstance(p, tuple)).decode("utf-8", errors="ignore")
+            if wanted and wanted in normalize(body):
+                return True
+        return False
 
     def close(self):
         try:
