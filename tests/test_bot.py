@@ -771,7 +771,9 @@ def test_linkedin_posts_are_never_auto_applied():
 # --- Memoria: no postularse dos veces a la misma vacante ---------------------------
 def _job_with(title, company, email, jid):
     return Job(title=title, url=f"https://www.linkedin.com/jobs/view/{jid}/", source="alertas_linkedin (linkedin)",
-               company=company, description=f"Medellín. Envía tu HV a {email}", enriched=True)
+               company=company, enriched=True,
+               description=f"Medellín, presencial. Administración de Fortinet, firewall, VPN, Zabbix y redes LAN/WAN. "
+                           f"Envía tu HV a {email}")
 
 
 def test_vacancy_key_normalizes_company_and_title():
@@ -792,18 +794,23 @@ def test_republished_vacancy_with_other_email_is_not_sent_twice(tmp_path, monkey
     ap2 = _postulador(tmp_path, html="")
     ap2.seen = SeenStore(tmp_path / "seen.json")
     # Republicada: otro id de LinkedIn y otra persona de contacto
-    again = _job_with("Ingeniero de Redes", "Acme Redes SAS", "otra.persona@acmeredes.co", 4077777777)
+    again = _job_with("Ingeniero de Redes y Seguridad", "ACME REDES S.A.S.", "otra.persona@acmeredes.co", 4077777777)
     monkeypatch.setattr(ap2, "enrich", lambda job: (job.extract_emails(), True)[1])
     assert ap2.run([again]) == []
     assert len(_FakeSMTP.sent) == 2  # solo el primer envío y su resumen
+    # Control: sin la memoria, esa misma vacante sí se habría enviado.
+    (tmp_path / "otro").mkdir()
+    fresh = _postulador(tmp_path / "otro")
+    monkeypatch.setattr(fresh, "enrich", lambda job: (job.extract_emails(), True)[1])
+    assert len(fresh.run([_job_with("Ingeniero de Redes y Seguridad", "ACME REDES S.A.S.", "otra.persona@acmeredes.co", 4077777777)])) == 1
 
 
 def test_same_vacancy_twice_in_one_run(tmp_path, monkeypatch):
     _smtp_env(monkeypatch)
     ap = _postulador(tmp_path)
     monkeypatch.setattr(ap, "enrich", lambda job: (job.extract_emails(), True)[1])
-    a = _job_with("Analista NOC", "Redes XYZ", "a@redesxyz.co", 4011111111)
-    b = _job_with("Analista NOC", "Redes XYZ", "b@redesxyz.co", 4022222222)
+    a = _job_with("Ingeniero de Redes", "Redes XYZ", "a@redesxyz.co", 4011111111)
+    b = _job_with("Ingeniero de Redes", "Redes XYZ", "b@redesxyz.co", 4022222222)
     assert len(ap.run([a, b])) == 1
 
 
