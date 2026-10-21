@@ -62,8 +62,15 @@ class EmailAlertSource:
                 "id_re": re.compile(s["id_regex"]) if s.get("id_regex") else None,
                 "url_id": s.get("url_id", ""),
             })
-        self.user = os.environ.get("IMAP_USER") or os.environ.get("SMTP_USER", "")
-        self.password = os.environ.get("IMAP_PASSWORD") or os.environ.get("SMTP_PASSWORD", "")
+        # Buzón propio (`usuario_env`/`clave_env`: nombres de variables de entorno),
+        # p. ej. otro Gmail donde llegan las alertas de LinkedIn. Si no, el del bot.
+        self.own_mailbox = bool(cfg.get("usuario_env"))
+        if self.own_mailbox:
+            self.user = os.environ.get(cfg["usuario_env"], "")
+            self.password = os.environ.get(cfg.get("clave_env", ""), "")
+        else:
+            self.user = os.environ.get("IMAP_USER") or os.environ.get("SMTP_USER", "")
+            self.password = os.environ.get("IMAP_PASSWORD") or os.environ.get("SMTP_PASSWORD", "")
         self.host = os.environ.get("IMAP_HOST", "imap.gmail.com")
         self._done = False
 
@@ -137,6 +144,9 @@ class EmailAlertSource:
             return []
         self._done = True
         if not (self.user and self.password):
+            if self.own_mailbox:  # buzón opcional aún no configurado
+                log.info("%s: sin credenciales de su buzón; se omite", self.name)
+                return []
             raise RuntimeError("faltan SMTP_USER/SMTP_PASSWORD para leer el correo")
         return self._fetch()
 

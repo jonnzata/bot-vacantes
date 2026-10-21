@@ -148,7 +148,86 @@ def resumir_correos():
                         break
 
 
+def remitentes_linkedin():
+    """Cuenta los correos de LinkedIn de los últimos 60 días por dirección de
+    remitente (sin mostrar contenido), en la bandeja y en 'Todos'."""
+    buzones = [("bot", os.environ.get("SMTP_USER"), os.environ.get("SMTP_PASSWORD")),
+               ("linkedin", os.environ.get("LINKEDIN_IMAP_USER"), os.environ.get("LINKEDIN_IMAP_PASSWORD"))]
+    for nombre, user, pwd in buzones:
+        if not (user and pwd):
+            print(f"\n(buzón {nombre}: sin credenciales)")
+            continue
+        print(f"\n##### buzón {nombre} #####")
+        try:
+            _contar_linkedin(user, pwd)
+        except Exception as exc:
+            print(f"ERR  {exc!r}")
+
+
+def _contar_linkedin(user, pwd):
+    from datetime import date, timedelta
+    since = (date.today() - timedelta(days=60)).strftime("%d-%b-%Y")
+    with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
+        imap.login(user, pwd)
+        for carpeta in ("INBOX", '"[Gmail]/All Mail"', '"[Gmail]/Todos"'):
+            try:
+                ok, _ = imap.select(carpeta, readonly=True)
+            except Exception:
+                ok = "NO"
+            if ok != "OK":
+                continue
+            _, data = imap.search(None, "SINCE", since, "FROM", '"linkedin.com"')
+            ids = data[0].split() if data and data[0] else []
+            cuentas = {}
+            # Una sola petición para todos los encabezados (de uno en uno Gmail corta).
+            lote = b",".join(ids[-300:])
+            _, md = imap.fetch(lote, "(BODY.PEEK[HEADER.FIELDS (FROM)])") if lote else (None, [])
+            for parte in md:
+                if not isinstance(parte, tuple):
+                    continue
+                m = re.search(r"[\w.+-]+@[\w.-]*linkedin\.com", parte[1].decode(errors="ignore"))
+                addr = m.group(0).lower() if m else "?"
+                cuentas[addr] = cuentas.get(addr, 0) + 1
+            print(f"\n=== LinkedIn en {carpeta}: {len(ids)} correos (60 días) ===")
+            for addr, n in sorted(cuentas.items(), key=lambda x: -x[1]):
+                print(f"  {n:4}  {addr}")
+
+
+def probar_publicaciones():
+    """Busca publicaciones de LinkedIn con Brave y prueba el OCR de sus imágenes."""
+    if not os.environ.get("BRAVE_API_KEY"):
+        print("\n(sin BRAVE_API_KEY: no se prueban las publicaciones de LinkedIn)")
+        return
+    import yaml
+    from bot.filters import JobFilter
+    from bot.sources.social_posts import LinkedInPostsSource
+
+    config = yaml.safe_load((Path(__file__).resolve().parent.parent / "config.yaml").read_text(encoding="utf-8"))
+    cfg = next(f for f in config["fuentes"] if f.get("tipo") == "publicaciones")
+    cfg = {**cfg, "consultas": cfg["consultas"][:2]}  # pocas, para no gastar cupo
+    src = LinkedInPostsSource(cfg, Http(pause=1.1))
+    flt = JobFilter(config, [])
+    print("\n=== publicaciones de LinkedIn ===")
+    try:
+        jobs = src.search("")
+    except Exception as exc:
+        print(f"ERR  {exc!r}")
+        return
+    recientes = [j for j in jobs if flt.is_recent(j)]
+    print(f"publicaciones={len(jobs)} recientes={len(recientes)} con_imagen={sum(1 for j in jobs if j._image)}")
+    for j in (recientes or jobs)[:8]:
+        antes = len(j.description)
+        try:
+            src.enrich(j)
+        except Exception as exc:
+            print(f"  ERR imagen: {exc!r}")
+        print(f"  [{flt.reject_reason(j) or 'ACEPTADA'}] {j.published or '¿fecha?'} {j.title[:70]!r} | texto={antes} "
+              f"ocr={len(j.description) - antes} | {j.url[:80]}")
+
+
 if __name__ == "__main__":
     probar_remotos()
+    probar_publicaciones()
     probar_urls()
     resumir_correos()
+    remitentes_linkedin()

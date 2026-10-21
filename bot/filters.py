@@ -37,7 +37,7 @@ class JobFilter:
 
     def in_antioquia(self, job: Job) -> bool:
         # Se prioriza el campo de ubicación; solo si está vacío se mira el texto.
-        where = normalize(job.location) or normalize(job.description[:600])
+        where = normalize(job.location) or normalize(f"{job.title} {job.description[:1500]}")
         if matched_terms(where, self.towns):
             return True
         return self.allow_remote and self.remote_ok(job)
@@ -76,6 +76,10 @@ class JobFilter:
         weak_hits = matched_terms(title, self.include_title)
         desc_hits = matched_terms(desc, self.include)
         if not title_hits:
+            if job.remote and not weak_hits:
+                # Portales internacionales: sus descripciones en inglés mencionan
+                # herramientas técnicas aunque el cargo no sea de sistemas.
+                return 0
             if weak_hits:
                 # Título ambiguo ("Analista de redes", "Ingeniero de infraestructura"):
                 # si hay descripción completa, debe confirmar que es de sistemas.

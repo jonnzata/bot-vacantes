@@ -373,6 +373,170 @@ def test_accepts_all_it_jobs_even_without_cv_matches():
     assert not flt.accept(_area_job("Profesional universitario", relleno + "Servidor público de carrera administrativa"))
 
 
+def test_linkedin_mailbox_is_optional(monkeypatch):
+    from bot.sources.email_alerts import EmailAlertSource
+    cfg = next(f for f in CONFIG["fuentes"] if f["nombre"] == "alertas_linkedin")
+    monkeypatch.delenv("LINKEDIN_IMAP_USER", raising=False)
+    monkeypatch.setenv("SMTP_USER", "bot@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    assert EmailAlertSource(cfg).search("sistemas") == []  # sin secrets: se omite, no falla
+    monkeypatch.setenv("LINKEDIN_IMAP_USER", "otro@gmail.com")
+    monkeypatch.setenv("LINKEDIN_IMAP_PASSWORD", "y")
+    src = EmailAlertSource(cfg)
+    assert (src.user, src.password) == ("otro@gmail.com", "y")
+    jobs = src.parse_alert(LINKEDIN_ALERT, src.senders[0])
+    assert jobs[0].url == "https://www.linkedin.com/jobs/view/4011223344/"
+
+
+# --- Publicaciones de LinkedIn ---------------------------------------------------
+import shutil  # noqa: E402
+
+import pytest  # noqa: E402
+
+from bot.sources.social_posts import LinkedInPostsSource, ocr_image  # noqa: E402
+
+BRAVE = {"web": {"results": [
+    {"title": "Ana Gómez en LinkedIn: #vacante #empleo Buscamos Técnico en sistemas",
+     "url": "https://www.linkedin.com/posts/ana-gomez_vacante-empleo-activity-7111?utm_source=x",
+     "description": "Buscamos <strong>Técnico en sistemas</strong> para Medellín. Soporte técnico a usuarios.",
+     "page_age": "2026-10-20T10:00:00", "thumbnail": {"original": "https://media.licdn.com/img.jpg"}},
+    {"title": "Ofertas | LinkedIn", "url": "https://www.linkedin.com/jobs/search?keywords=x",
+     "description": "listado"},  # no es una publicación
+]}}
+
+
+def _post_source():
+    cfg = next(f for f in CONFIG["fuentes"] if f["tipo"] == "publicaciones")
+    return LinkedInPostsSource(cfg, http=None)
+
+
+def test_linkedin_posts_parse():
+    jobs = _post_source().parse(BRAVE)
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.title == "#vacante #empleo Buscamos Técnico en sistemas · ana gomez vacante empleo"
+    assert job.url == "https://www.linkedin.com/posts/ana-gomez_vacante-empleo-activity-7111"
+    assert job.published == "2026-10-20" and job._image == "https://media.licdn.com/img.jpg"
+    assert make_filter().accept(job)  # Medellín viene en el texto, no en un campo
+
+
+def test_linkedin_posts_without_key_are_skipped(monkeypatch):
+    monkeypatch.delenv("BRAVE_API_KEY", raising=False)
+    assert _post_source().search("") == []
+
+
+def _image_bytes(lines):
+    from PIL import Image, ImageDraw, ImageFont
+    img = Image.new("RGB", (1400, 120 * len(lines) + 80), "white")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default(size=64)
+    for i, line in enumerate(lines):
+        draw.text((40, 40 + 120 * i), line, fill="black", font=font)
+    buf = __import__("io").BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.mark.skipif(not shutil.which("tesseract"), reason="Tesseract no instalado")
+def test_vacancy_published_as_image_is_read_with_ocr():
+    png = _image_bytes(["VACANTE", "Analista de soporte TI", "Medellin - presencial", "Envia tu HV a", "rrhh@acme.co"])
+
+    class FakeHttp:
+        def get(self, url):
+            return type("R", (), {"content": png})()
+
+    src = _post_source()
+    src.http = FakeHttp()
+    job = Job(title="Juan Pérez: ¡Estamos contratando! 🚀", url="https://www.linkedin.com/posts/x", source="t",
+              description="¡Estamos contratando! Postúlate 👇")
+    job._image = "https://media.licdn.com/img.png"
+    flt = make_filter()
+    assert not flt.accept(job)  # sin la imagen no hay datos para saber que es de sistemas
+    src.enrich(job)
+    job.extract_emails()
+    assert "soporte" in job.description.lower()
+    assert flt.accept(job)
+    assert any(m.endswith("acme.co") for m in job.emails)
+    assert "verifícalo" in job_to_text(job)
+
+
+def test_ocr_without_tesseract_returns_empty(monkeypatch):
+    import pytesseract
+    def boom(*a, **k):
+        raise pytesseract.TesseractNotFoundError()
+    monkeypatch.setattr(pytesseract, "image_to_string", boom)
+    assert ocr_image(_image_bytes(["hola"])) == ""
+
+
+def test_international_remote_jobs_need_it_title():
+    flt = make_filter()
+    desc = "We use SQL, Python and AWS daily. Linux servers and Docker. " * 6
+    assert not flt.accept(_remote("Risk Analyst", "Worldwide", desc))
+    assert not flt.accept(_remote("Customer Support Consultant hospitality", "Worldwide", desc))
+    assert not flt.accept(_remote("Norwegian Tech Linguistic Tester", "Anywhere", desc))
+    assert flt.accept(_remote("Infrastructure Engineer", "LATAM", desc))
+    assert flt.accept(_remote("Senior Backend Engineer", "Worldwide", desc))
+
+
+def test_brave_retries_without_filters_on_422(monkeypatch):
+    import requests
+
+    calls = []
+
+    class Resp:
+        def __init__(self, status, payload):
+            self.status_code, self._payload, self.text = status, payload, '{"error":"invalid"}'
+
+        def json(self):
+            return self._payload
+
+    class FakeHttp:
+        def get(self, url, headers=None, params=None):
+            calls.append(params)
+            if "freshness" in params:
+                raise requests.HTTPError("422", response=Resp(422, {}))
+            assert set(params) == {"q", "count"}
+            return Resp(200, BRAVE)
+
+    monkeypatch.setenv("BRAVE_API_KEY", "k")
+    src = _post_source()
+    assert not src.freshness  # por defecto, sin filtro de fecha
+    src.freshness = "pw"
+    src.http = FakeHttp()
+    src.queries = ["site:linkedin.com/posts vacante sistemas"]
+    jobs = src.search("")
+    assert len(jobs) == 1 and len(calls) == 2 and "freshness" not in calls[1]
+    assert "country" not in calls[0]  # Brave no admite Colombia como país
+
+
+def test_linkedin_post_uses_url_words_and_survives_bad_image():
+    payload = {"web": {"results": [{
+        "title": "Empresa XYZ en LinkedIn: ¡Únete a nuestro equipo!",
+        "url": "https://co.linkedin.com/posts/empresa-xyz_vacante-ingeniero-de-sistemas-medellin-activity-7123456",
+        "description": "¡Únete a nuestro equipo! Postúlate ya.",
+        "thumbnail": {"original": "https://media.licdn.com/caducada.jpg"}}]}}
+    src = _post_source()
+    job = src.parse(payload)[0]
+    assert job.title == "¡Únete a nuestro equipo! · empresa xyz vacante ingeniero de sistemas medellin"
+
+    class BrokenHttp:
+        def get(self, url):
+            raise RuntimeError("400 Bad Request")
+
+    src.http = BrokenHttp()
+    src.enrich(job)  # no debe fallar
+    assert job.enriched and make_filter().accept(job)
+
+
+def test_linkedin_post_date_from_activity_id():
+    from bot.sources.social_posts import post_date
+    # 7123456789012345678 >> 22 = 1698364445927 ms → 26-oct-2023
+    assert post_date("https://www.linkedin.com/posts/x_vacante-activity-7123456789012345678-AbCd") == "2023-10-26"
+    assert post_date("https://www.linkedin.com/feed/update/urn:li:activity:7123456789012345678/") == "2023-10-26"
+    assert post_date("https://www.linkedin.com/posts/sin-id") == ""
+    old = Job(title="Vacante ingeniero de sistemas Medellín", url="u", source="t",
+              published=post_date("https://www.linkedin.com/posts/x-activity-7123456789012345678"))
+    assert make_filter().reject_reason(old) == "antigua"
 # --- Postulación automática ---------------------------------------------------------
 GUEST_HTML = """<section>
 <h2 class="top-card-layout__title">Ingeniero de Redes y Seguridad</h2>
@@ -589,3 +753,13 @@ def test_sent_folder_finds_localized_name(monkeypatch):
     folder = mod.SentFolder("h", "u", "p")
     assert folder.imap.selected == '"[Gmail]/Enviados"'
     assert folder.contains("rrhh@x.co", 120) and not folder.contains("otro@x.co", 120)
+
+
+def test_linkedin_posts_are_never_auto_applied():
+    """Las publicaciones (y sus correos leídos por OCR) nunca disparan una
+    postulación automática: solo las ofertas /jobs/view/ de LinkedIn."""
+    from bot.autopostular import linkedin_id
+    post = _post_source().parse(BRAVE)[0]
+    post.description += " [Texto de la imagen] rrhh@acme.co"
+    post.extract_emails()
+    assert post.emails and linkedin_id(post) is None

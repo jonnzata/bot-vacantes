@@ -2,6 +2,7 @@ from .email_alerts import EmailAlertSource
 from .html_listing import HtmlListingSource
 from .jooble import JoobleSource
 from .remote_apis import RemoteApiSource
+from .social_posts import LinkedInPostsSource
 
 
 def build_sources(config: dict, http) -> list:
@@ -18,6 +19,8 @@ def build_sources(config: dict, http) -> list:
             sources.append(HtmlListingSource(cfg, http))
         elif kind == "remoto":
             sources.append(RemoteApiSource(cfg, http))
+        elif kind == "publicaciones":
+            sources.append(LinkedInPostsSource(cfg, http))
         else:
             raise ValueError(f"Tipo de fuente desconocido: {kind!r}")
     return sources

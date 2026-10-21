@@ -23,10 +23,11 @@ No repite vacantes, porque guarda un registro de las que ya te envió.
 | **Get on Board** | API pública (LatAm, en español) | nada |
 | **Remotive, RemoteOK, Jobicy, Himalayas, Working Nomads** | APIs públicas de teletrabajo | nada |
 | **We Work Remotely** | RSS público (sysadmin/devops, soporte, programación) | nada |
+| **Publicaciones de LinkedIn** | Publicaciones públicas de personas ("estamos contratando", "#vacante") encontradas con la API de Brave Search; si traen un diseño en imagen, se lee con OCR | `BRAVE_API_KEY` |
 
 Las vacantes de **teletrabajo** solo se envían si se pueden hacer desde Colombia: el bot descarta las híbridas o presenciales y las limitadas a otros países ("USA only", "Europe"…). Las regiones aceptadas se ajustan en `ubicacion.regiones_remoto`. Los portales internacionales se consultan cada pocas horas (`cada_horas`) para respetar sus límites de uso.
 
-> LinkedIn e Indeed bloquean los bots y sus términos de uso prohíben el scraping, por eso no se consultan directamente. Muchas de sus vacantes llegan igual a través de Jooble.
+> LinkedIn e Indeed bloquean los bots y sus términos de uso prohíben el scraping, por eso el bot no busca vacantes en ellos ni inicia sesión en tu cuenta (la postulación automática solo lee la página pública de las ofertas que te llegan en tus alertas). Sus vacantes llegan por tus alertas de correo, por Jooble y, en el caso de las publicaciones de personas en LinkedIn, por un buscador (Brave Search). El texto leído de las imágenes puede traer errores: el correo de contacto se marca para que lo verifiques.
 
 Los portales cambian su web de vez en cuando. Si una fuente deja de traer resultados, ajusta su `url` o su `enlace_regex` en `config.yaml`, sin tocar el código. También puedes agregar otros portales de la misma forma.
 
@@ -51,6 +52,9 @@ Ve a *Settings → Secrets and variables → Actions → New repository secret*:
 | `CALLMEBOT_APIKEY` | la clave que te dio CallMeBot |
 | `JOOBLE_API_KEY` | la clave de Jooble |
 | `CV_TEXT` | **el texto de tu hoja de vida**: copia el contenido de tu HV y pégalo aquí |
+| `LINKEDIN_IMAP_USER` | opcional: el Gmail de tu cuenta de LinkedIn, si es distinto de `SMTP_USER` |
+| `LINKEDIN_IMAP_PASSWORD` | la contraseña de aplicación de ese Gmail |
+| `BRAVE_API_KEY` | opcional: clave gratuita de <https://api-dashboard.search.brave.com> para buscar publicaciones de LinkedIn |
 
 Puedes configurar solo el correo, solo WhatsApp o los dos.
 
