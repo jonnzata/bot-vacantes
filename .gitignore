@@ -4,3 +4,5 @@ data/
 # Tu hoja de vida no se sube al repositorio (usa el secret CV_TEXT en GitHub)
 cv/*
 !cv/.gitkeep
+# La HV cifrada sí se sube (solo se puede leer con CV_GPG_PASSPHRASE)
+!cv/*.gpg

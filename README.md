@@ -27,7 +27,7 @@ No repite vacantes, porque guarda un registro de las que ya te envió.
 
 Las vacantes de **teletrabajo** solo se envían si se pueden hacer desde Colombia: el bot descarta las híbridas o presenciales y las limitadas a otros países ("USA only", "Europe"…). Las regiones aceptadas se ajustan en `ubicacion.regiones_remoto`. Los portales internacionales se consultan cada pocas horas (`cada_horas`) para respetar sus límites de uso.
 
-> LinkedIn e Indeed bloquean los bots y sus términos de uso prohíben el scraping, por eso no se consultan directamente: el bot nunca inicia sesión en tu cuenta. Sus vacantes llegan por tus alertas de correo, por Jooble y, en el caso de las publicaciones de personas en LinkedIn, por un buscador (Brave Search). El texto leído de las imágenes puede traer errores: el correo de contacto se marca para que lo verifiques.
+> LinkedIn e Indeed bloquean los bots y sus términos de uso prohíben el scraping, por eso el bot no busca vacantes en ellos ni inicia sesión en tu cuenta (la postulación automática solo lee la página pública de las ofertas que te llegan en tus alertas). Sus vacantes llegan por tus alertas de correo, por Jooble y, en el caso de las publicaciones de personas en LinkedIn, por un buscador (Brave Search). El texto leído de las imágenes puede traer errores: el correo de contacto se marca para que lo verifiques.
 
 Los portales cambian su web de vez en cuando. Si una fuente deja de traer resultados, ajusta su `url` o su `enlace_regex` en `config.yaml`, sin tocar el código. También puedes agregar otros portales de la misma forma.
 
@@ -61,6 +61,38 @@ Puedes configurar solo el correo, solo WhatsApp o los dos.
 ### 3. Activarlo
 
 El código debe quedar en la rama principal (`main`), porque GitHub solo ejecuta desde ahí las tareas programadas. Después, en la pestaña **Actions → Bot de vacantes → Run workflow**, puedes lanzarlo a mano para probarlo.
+
+## Postulación automática (LinkedIn)
+
+Las alertas a tu correo siguen igual. Además, cuando una vacante llega por las **alertas de LinkedIn** de tu Gmail, el bot lee la oferta pública y, si trae un **correo para enviar la HV**, te postula solo:
+
+- Envía desde tu Gmail un correo con tu **hoja de vida en PDF adjunta**. Si la oferta indica un asunto ("Asunto: …"), lo usa.
+- **Solo si la vacante cumple con tu hoja de vida** (`autopostulacion.perfil_hv`): el cargo es de tu área (infraestructura, redes, seguridad, cloud, soporte…), la oferta menciona al menos `min_coincidencias` habilidades de tu HV, no exige requisitos que no tienes (NSE4, CCNP, CISSP, inglés B2/C1…) ni más de `max_anios_experiencia` años. Las certificaciones que solo aparecen como *deseables* no descartan la vacante. Si no cumple, no se envía nada y el log dice por qué.
+- Solo postula a vacantes **presenciales en Medellín** o de **teletrabajo** (de Colombia o de otro país). Las híbridas se omiten.
+- Nunca envía a las empresas de `autopostulacion.excluir_empresas` (por ejemplo, tu empresa actual).
+- **Memoria: nunca escribe dos veces al mismo correo.** Guarda un registro de las vacantes y correos a los que ya envió y, antes de cada envío, revisa tu carpeta de **Enviados de Gmail** (últimos `revisar_enviados_dias` días): si ya le escribiste a esa dirección, por el bot o a mano, no envía. Si Gmail no responde, esa ejecución no envía nada.
+- Envía como máximo `max_por_dia` correos al día y al final te manda un **resumen** de las postulaciones.
+
+### Activarla
+
+1. En LinkedIn, crea alertas de empleo (Medellín y "En remoto") para que lleguen a tu Gmail.
+2. Cifra tu HV y súbela al repositorio. El repo es público, así que solo se sube cifrada (PowerShell, con Git para Windows):
+   ```powershell
+   copy C:\ruta\HDVJONNY.pdf cv\hoja_de_vida.pdf
+   & "C:\Program Files\Git\usr\bin\gpg.exe" --symmetric --cipher-algo AES256 --output cv/hoja_de_vida.pdf.gpg cv/hoja_de_vida.pdf
+   git add cv/hoja_de_vida.pdf.gpg
+   git commit -m "HV cifrada"
+   git push
+   ```
+3. Agrega estos secrets:
+
+| Secret | Ejemplo |
+|---|---|
+| `CV_GPG_PASSPHRASE` | la clave que usaste al cifrar |
+| `NOMBRE_REMITENTE` | `Jonny Alberto Zapata Taborda` |
+| `FIRMA_CORREO` | `Jonny Alberto Zapata Taborda\nIngeniero Informático\n333 430 6808` (`\n` = salto de línea) |
+
+Para probar sin enviar nada: `python -m bot.main --dry-run` muestra a quién se postularía.
 
 ## Ajustes (`config.yaml`)
 

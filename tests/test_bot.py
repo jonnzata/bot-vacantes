@@ -537,3 +537,229 @@ def test_linkedin_post_date_from_activity_id():
     old = Job(title="Vacante ingeniero de sistemas Medellín", url="u", source="t",
               published=post_date("https://www.linkedin.com/posts/x-activity-7123456789012345678"))
     assert make_filter().reject_reason(old) == "antigua"
+# --- Postulación automática ---------------------------------------------------------
+GUEST_HTML = """<section>
+<h2 class="top-card-layout__title">Ingeniero de Redes y Seguridad</h2>
+<a class="topcard__org-name-link">Acme Redes SAS</a>
+<span class="topcard__flavor topcard__flavor--bullet">Medellín, Antioquia, Colombia</span>
+<div class="show-more-less-html__markup">Buscamos ingeniero con FortiGate y Zabbix. Trabajo presencial.
+Envía tu hoja de vida a talento@acmeredes.co con el Asunto: Ingeniero Redes MDE</div>
+</section>"""
+
+
+class _FakeHttp:
+    def __init__(self, html):
+        self.html = html
+
+    def get(self, url):
+        return type("R", (), {"text": self.html})()
+
+
+def _postulador(tmp_path, html=GUEST_HTML, **cfg):
+    from bot.autopostular import AutoPostulador
+    from bot.storage import SeenStore
+    config = {"autopostulacion": {**CONFIG["autopostulacion"], "activa": True, **cfg}}
+    cv = tmp_path / "hv.pdf"
+    cv.write_bytes(b"%PDF-1.4 prueba")
+    return AutoPostulador(config, _FakeHttp(html), SeenStore(tmp_path / "seen.json"), cv)
+
+
+def _fake_sent_folder(already):
+    class FakeSent:
+        opened = 0
+
+        def __init__(self, *a):
+            FakeSent.opened += 1
+
+        def contains(self, addr, days):
+            return addr in already
+
+        def close(self):
+            pass
+    return FakeSent
+
+
+def _linkedin_job(title="Ingeniero de Redes", desc="Medellín, Antioquia"):
+    return Job(title=title, url="https://www.linkedin.com/jobs/view/4011223344/",
+               source="alertas_correo (linkedin)", description=desc, enriched=True)
+
+
+def test_guest_posting_and_subject(tmp_path):
+    ap = _postulador(tmp_path)
+    job = _linkedin_job()
+    assert ap.enrich(job)
+    assert job.company == "Acme Redes SAS" and job.location.startswith("Medellín")
+    assert ap.clean_emails(job.emails) == ["talento@acmeredes.co"]
+    assert ap.subject_for(job) == "Ingeniero Redes MDE"
+    assert ap.place_ok(job) is None
+
+
+def test_place_rules(tmp_path):
+    ap = _postulador(tmp_path)
+    mk = lambda loc, desc: Job(title="Ingeniero", url="u", source="s", location=loc, description=desc)
+    assert ap.place_ok(mk("Bogotá, Colombia", "Trabajo presencial")) == "presencial fuera de Medellín"
+    assert ap.place_ok(mk("Medellín, Antioquia", "Modalidad híbrida 3x2")) == "híbrida"
+    assert ap.place_ok(mk("Madrid, España", "Puesto 100% remoto")) is None
+    assert ap.place_ok(mk("United States", "Fully remote position")) is None
+
+
+def test_excludes_current_employer(tmp_path):
+    ap = _postulador(tmp_path)
+    job = Job(title="Ingeniero NOC", url="u", source="s", company="Netmask Latam", description="x")
+    assert ap.excluded_company(job, ["rrhh@otra.com"])
+    job = Job(title="Ingeniero NOC", url="u", source="s", company="Reclutadora", description="x")
+    assert ap.excluded_company(job, ["seleccion@netmask.co"])
+    assert not ap.excluded_company(job, ["seleccion@acme.co"])
+
+
+def test_autopostula_sends_cv_once(tmp_path, monkeypatch):
+    sent = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def login(self, *a): pass
+        def sendmail(self, frm, to, raw): sent.append((to, raw))
+
+    import bot.autopostular as mod
+    monkeypatch.setattr(mod.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setattr(mod, "SentFolder", _fake_sent_folder(set()))
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    ap = _postulador(tmp_path)
+    other = Job(title="Dev", url="https://computrabajo.com/x", source="computrabajo", description="a@b.co")
+    done = ap.run([_linkedin_job(), other])
+    assert len(done) == 1
+    assert sent[0][0] == ["talento@acmeredes.co"]
+    assert "hv.pdf" in sent[0][1] and "Ingeniero Redes MDE" in sent[0][1]
+    assert sent[1][0] == ["yo@gmail.com"]          # resumen para ti
+    assert ap.run([_linkedin_job()]) == []          # no se repite
+    assert len(sent) == 2
+
+
+def test_autopostula_skips_netmask_and_no_email(tmp_path, monkeypatch):
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+    netmask = GUEST_HTML.replace("Acme Redes SAS", "Netmask")
+    assert _postulador(tmp_path, html=netmask).run([_linkedin_job()], dry_run=True) == []
+    sin_correo = GUEST_HTML.replace("talento@acmeredes.co", "nuestro portal")
+    assert _postulador(tmp_path, html=sin_correo).run([_linkedin_job()], dry_run=True) == []
+
+
+def test_profile_matches_cv(tmp_path):
+    ap = _postulador(tmp_path)
+    mk = lambda title, desc: Job(title=title, url="u", source="s", description=desc)
+    azure = mk("Administrador(a) de Nube Azure / Windows Server",
+               "Administración de Windows Server, Active Directory y DNS, nube Azure, ITIL. "
+               "Mínimo 2-3 años de experiencia en administración de sistemas.")
+    assert ap.profile_ok(azure) is None
+    assert {"azure", "windows server", "active directory", "itil"} <= set(azure.matched_skills)
+    assert ap.profile_ok(mk("Desarrollador Python", "Python, Docker, Linux, SQL")) == "cargo fuera de tu perfil"
+    assert ap.profile_ok(mk("Cybersecurity IAM Specialist", "Experiencia con SailPoint, firewall, siem")) \
+        == "pide sailpoint"
+    assert ap.profile_ok(mk("Ingeniero de Redes", "Mínimo 8 años de experiencia con FortiGate, VPN y SD-WAN")) \
+        == "pide 8 años de experiencia"
+    assert ap.profile_ok(mk("Ingeniero de Soporte", "Atención a usuarios y manejo de impresoras")).startswith(
+        "pocas coincidencias")
+    english = mk("Network Security Engineer", "We are looking for an engineer with experience in Fortinet firewalls "
+                 "and VPN. You will work with our team and the customers, and you will own the network. "
+                 "We offer a great team for you and your career with the best experience.")
+    assert ap.profile_ok(english) == "oferta en inglés"
+
+
+def test_required_vs_desirable_certifications(tmp_path):
+    ap = _postulador(tmp_path)
+    upk = Job(title="Profesional certificado(a) en FORTINET NSE4", url="u", source="s",
+              location="Área metropolitana de Medellín",
+              description="Requisitos indispensables:\nContar con certificación Fortinet NSE4 vigente.\n"
+                          "Envía tu hoja de vida al correo: rrhh@upk.co")
+    assert ap.profile_ok(upk) == "pide nse4"
+    evertec = Job(title="Cybersecurity Specialist Automation", url="u", source="s",
+                  description="Lo que buscamos\nConocimientos de Linux y Windows.\nMonitorear el SIEM y gestionar "
+                              "incidentes y vulnerabilidades.\nValoraremos adicionalmente\n"
+                              "Certificaciones CISSP, Security+ u otras.")
+    assert ap.profile_ok(evertec) is None
+
+
+class _FakeSMTP:
+    sent = []
+
+    def __init__(self, *a, **k): pass
+    def __enter__(self): return self
+    def __exit__(self, *a): pass
+    def login(self, *a): pass
+    def sendmail(self, frm, to, raw): _FakeSMTP.sent.append(to)
+
+
+def _smtp_env(monkeypatch, already=()):
+    import bot.autopostular as mod
+    _FakeSMTP.sent = []
+    monkeypatch.setattr(mod.smtplib, "SMTP_SSL", _FakeSMTP)
+    monkeypatch.setattr(mod, "SentFolder", _fake_sent_folder(set(already)))
+    monkeypatch.setenv("SMTP_USER", "yo@gmail.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "x")
+
+
+def test_skips_if_already_in_gmail_sent(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch, already={"talento@acmeredes.co"})
+    ap = _postulador(tmp_path)
+    assert ap.run([_linkedin_job()]) == []
+    assert _FakeSMTP.sent == []
+    assert ap.already_applied("talento@acmeredes.co")   # queda en la memoria del bot
+
+
+def test_never_writes_twice_to_same_address(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    ap = _postulador(tmp_path)
+    first = _linkedin_job()
+    second = Job(title="Analista de Redes", url="https://www.linkedin.com/jobs/view/4099999999/",
+                 source="alertas_correo (linkedin)", description="Medellín", enriched=True)
+    assert len(ap.run([first, second])) == 1     # misma dirección en las dos ofertas
+    assert _FakeSMTP.sent[0] == ["talento@acmeredes.co"]
+    ap.seen.save()
+    from bot.storage import SeenStore
+    ap2 = _postulador(tmp_path)
+    ap2.seen = SeenStore(tmp_path / "seen.json")  # memoria tras reiniciar
+    third = Job(title="Ingeniero NOC", url="https://www.linkedin.com/jobs/view/4088888888/",
+                source="alertas_correo (linkedin)", description="Medellín", enriched=True)
+    assert ap2.run([third]) == []
+
+
+def test_no_send_if_sent_folder_unavailable(tmp_path, monkeypatch):
+    _smtp_env(monkeypatch)
+    import bot.autopostular as mod
+
+    class Broken:
+        def __init__(self, *a):
+            raise OSError("imap caído")
+    monkeypatch.setattr(mod, "SentFolder", Broken)
+    assert _postulador(tmp_path).run([_linkedin_job()]) == []
+    assert _FakeSMTP.sent == []
+
+
+def test_sent_folder_finds_localized_name(monkeypatch):
+    import bot.autopostular as mod
+
+    class FakeImap:
+        def __init__(self, host): self.selected = None
+        def login(self, *a): pass
+        def list(self):
+            return "OK", [b'(\\HasNoChildren) "/" "INBOX"', b'(\\HasNoChildren \\Sent) "/" "[Gmail]/Enviados"']
+        def select(self, name, readonly): self.selected = name; return "OK", [b"3"]
+        def search(self, *crit): return "OK", [b"7" if '"rrhh@x.co"' in crit else b""]
+        def logout(self): pass
+    monkeypatch.setattr(mod.imaplib, "IMAP4_SSL", FakeImap)
+    folder = mod.SentFolder("h", "u", "p")
+    assert folder.imap.selected == '"[Gmail]/Enviados"'
+    assert folder.contains("rrhh@x.co", 120) and not folder.contains("otro@x.co", 120)
+
+
+def test_linkedin_posts_are_never_auto_applied():
+    """Las publicaciones (y sus correos leídos por OCR) nunca disparan una
+    postulación automática: solo las ofertas /jobs/view/ de LinkedIn."""
+    from bot.autopostular import linkedin_id
+    post = _post_source().parse(BRAVE)[0]
+    post.description += " [Texto de la imagen] rrhh@acme.co"
+    post.extract_emails()
+    assert post.emails and linkedin_id(post) is None

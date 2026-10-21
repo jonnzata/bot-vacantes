@@ -5,6 +5,9 @@ perfil:
   # Ruta a tu hoja de vida (PDF o TXT). Opcional: si no existe se usa la
   # variable de entorno CV_TEXT (útil para no subir tu HV al repositorio).
   hoja_de_vida: cv/hoja_de_vida.pdf
+  # PDF que se adjunta en las postulaciones automáticas. En GitHub Actions se
+  # descifra desde cv/hoja_de_vida.pdf.gpg (ver README).
+  hoja_de_vida_pdf: cv/hoja_de_vida.pdf
 
   # Términos que se buscan en los portales.
   busquedas:
@@ -376,6 +379,165 @@ ejecucion:
   max_whatsapp: 10          # tope de mensajes de WhatsApp por ejecución
   max_detalles: 150         # tope de páginas de detalle descargadas por ejecución
   pausa_segundos: 1.5       # pausa entre peticiones (ser respetuoso con los portales)
+
+# --- Postulación automática (solo vacantes de LinkedIn con correo) ---
+# Las alertas normales a tu correo siguen igual. Además, si una vacante que llegó
+# por las alertas de LinkedIn trae un correo para enviar la HV y cumple estas
+# reglas, el bot te postula solo y al final te manda un resumen.
+autopostulacion:
+  activa: true
+  fuentes: [linkedin]          # de qué alertas se postula automáticamente
+  excluir_empresas:            # nunca se envía la HV a estas empresas
+    - netmask
+  ciudades_presencial:         # presencial: solo en estas ciudades
+    - medellin
+  aceptar_hibrido: false       # false = las híbridas no se postulan
+  # El teletrabajo (desde Colombia u otro país) siempre se acepta.
+  max_por_dia: 15              # tope diario de correos (evita que Gmail te marque como spam)
+  # Memoria: nunca se escribe dos veces al mismo correo. Además del registro del
+  # bot, antes de enviar revisa tu carpeta de Enviados de Gmail de los últimos N días.
+  revisar_enviados_dias: 120
+
+  # Tu perfil (sacado de tu hoja de vida). La HV solo se envía si la vacante
+  # CUMPLE con él; si no, se omite y queda registrado el motivo en el log.
+  perfil_hv:
+    # El título debe ser de alguno de estos cargos...
+    cargos:
+      - infraestructura
+      - redes
+      - network
+      - networking
+      - seguridad
+      - ciberseguridad
+      - cybersecurity
+      - security
+      - soc
+      - noc
+      - cloud
+      - nube
+      - azure
+      - soporte
+      - support
+      - sistemas
+      - ti
+      - it
+      - sysadmin
+      - administrador de servidores
+      - administrador de plataforma
+      - devops
+      - helpdesk
+      - mesa de ayuda
+      - fortinet
+      - fortigate
+      - firewall
+    # ...y no de estos.
+    cargos_excluidos:
+      - desarrollador
+      - developer
+      - programador
+      - frontend
+      - backend
+      - full stack
+      - fullstack
+      - qa
+      - tester
+      - datos
+      - data
+      - sap
+      - salesforce
+      - comercial
+      - ventas
+      - preventa
+      - practicante
+      - aprendiz
+      - pasante
+      - intern
+      - electronico
+      - electrica
+    # Habilidades de tu HV: la descripción debe mencionar al menos `min_coincidencias`.
+    habilidades:
+      - fortigate
+      - fortinet
+      - fortimanager
+      - firewall
+      - firewalls
+      - vpn
+      - redes
+      - lan
+      - wan
+      - tcp/ip
+      - snmp
+      - zabbix
+      - monitoreo
+      - wazuh
+      - siem
+      - iso 27001
+      - drp
+      - bcp
+      - continuidad
+      - hardening
+      - nmap
+      - vulnerabilidades
+      - azure
+      - gcp
+      - google cloud
+      - docker
+      - docker compose
+      - contenedores
+      - linux
+      - windows server
+      - servidores
+      - active directory
+      - python
+      - ci/cd
+      - automatizacion
+      - sql
+      - power bi
+      - glpi
+      - itil
+      - mesa de servicio
+      - voip
+      - issabel
+      - aruba
+      - ubiquiti
+      - unifi
+      - bitdefender
+      - endpoint
+      - antivirus
+      - respaldos
+      - backup
+      - soporte n2
+      - soporte n3
+      - infraestructura
+      - ciberseguridad
+      - incidentes
+    min_coincidencias: 3
+    # Si la oferta pide algo de esto, se omite (no está en tu HV).
+    requisitos_que_no_cumplo:
+      - ccnp
+      - cissp
+      - cisa
+      - cism
+      - nse 4
+      - nse4
+      - nse 7
+      - nse7
+      - fcp
+      - sailpoint
+      - cyberark
+      - ingles avanzado
+      - ingles c1
+      - ingles b2
+      - bilingue
+      - english b2
+      - english c1
+      - fluent english
+      - advanced english
+    max_anios_experiencia: 6     # omite ofertas que piden más años de experiencia
+    omitir_ofertas_en_ingles: true   # tu nivel de inglés es B1
+  max_detalles: 30             # páginas de LinkedIn leídas por ejecución
+  # mensaje: |                 # opcional: tu propio texto. Variables: {cargo} {empresa}
+  #   ...                      # {empresa_de} {coincidencias} {firma}
 
 # --- Fuentes ---
 # remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se
