@@ -873,3 +873,28 @@ def test_email_text_formats_skills_and_attachment(tmp_path, monkeypatch):
     assert "lo que solicitan: FortiGate, VPN y LAN/WAN." in body
     assert ap.attachment_name() == "HV Jonny Alberto Zapata Taborda.pdf"
     assert 'filename="HV Jonny Alberto Zapata Taborda.pdf"' in ap.build_message(job, ["a@b.co"]).as_string()
+
+
+def test_experience_paragraph_depends_on_role(tmp_path):
+    ap = _postulador(tmp_path)
+    area = lambda title: ap.experience_for(Job(title=title, url="u", source="s"))[0]
+    assert area("Analista SOC") == "ciberseguridad"
+    assert area("Ingeniero de Seguridad Informática") == "ciberseguridad"
+    assert area("Ingeniero de Redes y Telecomunicaciones") == "redes"
+    assert area("Técnico de Soporte N2") == "soporte"
+    assert area("Agente Service Desk") == "soporte"
+    assert area("Administrador de Data Center") == "infraestructura y cloud"
+    assert area("Analista de Sistemas") == "general"
+    job = Job(title="Técnico de Soporte N2", url="u", source="s", company="X")
+    assert "mesa de servicio con GLPI" in ap.body_for(job) and "Soy Ingeniero Informático" in ap.body_for(job)
+
+
+def test_profile_accepts_whole_it_area_but_not_data_analytics(tmp_path):
+    ap = _postulador(tmp_path)
+    desc = "Medellín. Fortinet, firewall, VPN, redes, Windows Server, Active Directory, backup, GLPI."
+    ok = lambda title: ap.profile_ok(Job(title=title, url="u", source="s", description=desc)) is None
+    for title in ("Agente de Mesa de Servicio", "Técnico de Data Center", "Analista de Telecomunicaciones",
+                  "Coordinador de Tecnología", "Técnico Informático", "Ingeniero de Redes", "Analista SOC"):
+        assert ok(title), title
+    for title in ("Analista de Datos", "Data Engineer", "Desarrollador Backend", "Asesor Comercial TI"):
+        assert not ok(title), title

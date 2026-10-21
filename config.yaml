@@ -430,6 +430,37 @@ autopostulacion:
       - fortinet
       - fortigate
       - firewall
+      - help desk
+      - service desk
+      - mesa de servicio
+      - mesa de servicios
+      - tecnico informatico
+      - informatico
+      - informatica
+      - tecnologia
+      - tic
+      - telecomunicaciones
+      - telecom
+      - telefonia
+      - voip
+      - wifi
+      - inalambrico
+      - wireless
+      - data center
+      - centro de datos
+      - datacenter
+      - servidores
+      - plataformas
+      - monitoreo
+      - vulnerabilidades
+      - hardening
+      - continuidad
+      - backup
+      - respaldo
+      - linux
+      - windows
+      - active directory
+      - endpoint
     # ...y no de estos.
     cargos_excluidos:
       - desarrollador
@@ -441,8 +472,16 @@ autopostulacion:
       - fullstack
       - qa
       - tester
-      - datos
-      - data
+      - analista de datos
+      - ingeniero de datos
+      - cientifico de datos
+      - ciencia de datos
+      - data analyst
+      - data engineer
+      - data scientist
+      - analitica de datos
+      - big data
+      - business intelligence
       - sap
       - salesforce
       - comercial
@@ -536,8 +575,51 @@ autopostulacion:
     max_anios_experiencia: 6     # omite ofertas que piden más años de experiencia
     omitir_ofertas_en_ingles: true   # tu nivel de inglés es B1
   max_detalles: 30             # páginas de LinkedIn leídas por ejecución
+
+  # Párrafo de experiencia del correo según el tipo de cargo: se usa el del PRIMER
+  # grupo cuyo `cargos` aparezca en el título de la vacante. Si ninguno coincide,
+  # se usa el párrafo general (`experiencia_general`).
+  experiencia_general: >-
+    Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y
+    ciberseguridad: administración de firewalls FortiGate y FortiManager en entornos
+    multisede, monitoreo de redes con Zabbix y SNMP, implementación de SIEM (Wazuh)
+    alineado a ISO 27001, administración multinube (Azure y GCP) y automatización con
+    Python y Docker.
+  experiencia_por_area:
+    - area: ciberseguridad
+      cargos: [ciberseguridad, cybersecurity, seguridad, security, soc, siem, vulnerabilidades, hardening, pentest]
+      experiencia: >-
+        Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y
+        ciberseguridad: implementación de SIEM (Wazuh) alineado a ISO 27001, administración
+        de firewalls FortiGate y FortiManager en entornos multisede, hardening y gestión de
+        vulnerabilidades, protección de endpoints con Bitdefender, atención de incidentes y
+        planes de continuidad (DRP/BCP).
+    - area: redes
+      cargos: [redes, network, networking, noc, firewall, fortinet, fortigate, telecomunicaciones, telecom,
+               wifi, inalambrico, wireless, telefonia, voip, monitoreo]
+      experiencia: >-
+        Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI, con
+        énfasis en redes: administración de firewalls FortiGate y FortiManager en entornos
+        multisede, VPN, redes LAN/WAN y TCP/IP, equipos Aruba y Ubiquiti/UniFi, telefonía IP
+        (Issabel) y monitoreo de redes con Zabbix y SNMP.
+    - area: soporte
+      cargos: [soporte, support, helpdesk, help desk, mesa de ayuda, mesa de servicio, mesa de servicios,
+               service desk, tecnico informatico, informatico, endpoint]
+      experiencia: >-
+        Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y
+        soporte técnico: soporte N2 y N3, mesa de servicio con GLPI bajo buenas prácticas ITIL,
+        administración de Windows Server y Active Directory, protección de endpoints y
+        antivirus (Bitdefender), respaldos y telefonía IP (Issabel).
+    - area: infraestructura y cloud
+      cargos: [cloud, nube, azure, devops, infraestructura, servidores, sysadmin, plataforma, plataformas,
+               data center, centro de datos, datacenter, linux, windows, backup, respaldo, continuidad]
+      experiencia: >-
+        Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI:
+        administración multinube (Azure y GCP), servidores Linux y Windows Server, contenedores
+        con Docker y Docker Compose, automatización con Python y CI/CD, respaldos y planes de
+        continuidad (DRP/BCP), y monitoreo con Zabbix.
   # mensaje: |                 # opcional: tu propio texto. Variables: {cargo} {empresa}
-  #   ...                      # {empresa_de} {publicada} {coincidencias} {firma}
+  #   ...                      # {empresa_de} {publicada} {experiencia} {coincidencias} {firma}
 
 # --- Fuentes ---
 # remoto: portales de teletrabajo con API o RSS públicos (sin scraping). Se
