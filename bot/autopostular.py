@@ -39,7 +39,7 @@ DEFAULT_BODY = """Buen día, equipo de selección{empresa_de}:
 
 Me permito postularme a la vacante de {cargo}{publicada}. Adjunto mi hoja de vida.
 
-Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y ciberseguridad: administración de firewalls FortiGate y FortiManager en entornos multisede, monitoreo de redes con Zabbix y SNMP, implementación de SIEM (Wazuh) alineado a ISO 27001, administración multinube (Azure y GCP) y automatización con Python y Docker.
+{experiencia}
 
 {coincidencias}Quedo atento a sus comentarios y a la posibilidad de una entrevista.
 
@@ -47,6 +47,12 @@ Cordialmente,
 
 {firma}"""
 
+
+# Párrafo de experiencia si config.yaml no trae `experiencia_general`.
+DEFAULT_EXPERIENCE = ("Soy Ingeniero Informático con más de 5 años de experiencia en infraestructura TI y "
+                      "ciberseguridad: administración de firewalls FortiGate y FortiManager en entornos multisede, "
+                      "monitoreo de redes con Zabbix y SNMP, implementación de SIEM (Wazuh) alineado a ISO 27001, "
+                      "administración multinube (Azure y GCP) y automatización con Python y Docker.")
 
 # Cómo se escriben las habilidades en el correo (en config.yaml van sin tildes ni
 # mayúsculas para poder buscarlas). Las que no están aquí se dejan como vienen.
@@ -158,6 +164,9 @@ class AutoPostulador:
         self.max_per_day = cfg.get("max_por_dia", 15)
         self.max_details = cfg.get("max_detalles", 30)
         self.body_tpl = cfg.get("mensaje") or DEFAULT_BODY
+        self.experience_default = " ".join((cfg.get("experiencia_general") or DEFAULT_EXPERIENCE).split())
+        self.experience_areas = [(a.get("area", ""), a.get("cargos", []), " ".join(a.get("experiencia", "").split()))
+                                 for a in cfg.get("experiencia_por_area", [])]
         self.sent_days = cfg.get("revisar_enviados_dias", 120)
         self.imap_host = os.environ.get("IMAP_HOST", "imap.gmail.com")
         self._sent = None  # SentFolder, se abre la primera vez que se necesita
@@ -262,6 +271,14 @@ class AutoPostulador:
             return m.group(1).strip(" .")
         return f"Postulación – {job.title}"
 
+    def experience_for(self, job):
+        """(área, párrafo de experiencia) según el título de la vacante."""
+        title = normalize(job.title)
+        for area, roles, text in self.experience_areas:
+            if text and matched_terms(title, roles):
+                return area, text
+        return "general", self.experience_default
+
     def body_for(self, job) -> str:
         skills = skills_text(job.matched_skills[:6])
         return self.body_tpl.format(
@@ -269,6 +286,7 @@ class AutoPostulador:
             empresa=job.company,
             empresa_de=f" de {job.company}" if job.company else "",
             publicada=" publicada en LinkedIn" if "linkedin" in job.url else "",
+            experiencia=self.experience_for(job)[1],
             coincidencias=(f"En particular, tengo experiencia en lo que solicitan: {skills}.\n\n" if skills else ""),
             firma=self.signature,
         )

@@ -15,6 +15,16 @@ from bot.autopostular import AutoPostulador  # noqa: E402
 from bot.models import Job  # noqa: E402
 
 
+EJEMPLOS = [
+    ("Analista de Ciberseguridad", "Monitoreo en SIEM Wazuh, gestión de vulnerabilidades, hardening, "
+                                   "atención de incidentes e ISO 27001."),
+    ("Ingeniero de Redes", "Administración de FortiGate y firewalls, VPN, redes LAN/WAN, monitoreo con Zabbix y SNMP."),
+    ("Técnico de Soporte TI", "Soporte N2, mesa de servicio en GLPI, ITIL, Active Directory, Windows Server y antivirus."),
+    ("Ingeniero de Infraestructura Cloud", "Azure y GCP, servidores Linux, Docker, backup y DRP."),
+    ("Analista de Sistemas", "Soporte a usuarios, redes, servidores Windows Server, Active Directory y backup."),
+]
+
+
 def main():
     config = yaml.safe_load((BASE / "config.yaml").read_text(encoding="utf-8"))
     cv = BASE / config["perfil"].get("hoja_de_vida_pdf", "cv/hoja_de_vida.pdf")
@@ -25,17 +35,17 @@ def main():
     if not cv.exists():
         sys.exit(f"No está la hoja de vida en PDF ({cv}): revisa el secret CV_GPG_PASSPHRASE")
 
-    job = Job(title="Ingeniero de Redes y Seguridad", company="Empresa de Ejemplo SAS",
-              url="https://www.linkedin.com/jobs/view/0/", source="prueba", location="Medellín, Antioquia",
-              description="Administración de FortiGate y firewalls, VPN, redes LAN/WAN, monitoreo con "
-                          "Zabbix y SNMP, SIEM Wazuh. Medellín, presencial.")
-    reason = ap.profile_ok(job)  # calcula las coincidencias con tu HV como en una vacante real
-    msg = ap.build_message(job, to)
-    msg.replace_header("Subject", f"[PRUEBA] {msg['Subject']}")
     with ap._smtp() as server:
-        server.sendmail(ap.user, to, msg.as_string())
-    print(f"Correo de prueba enviado a {', '.join(to)}"
-          f" (coincidencias: {', '.join(job.matched_skills) or '-'}; perfil: {reason or 'cumple'})")
+        for title, desc in EJEMPLOS:  # un correo por cada área (párrafo de experiencia distinto)
+            job = Job(title=title, company="Empresa de Ejemplo SAS", url="https://www.linkedin.com/jobs/view/0/",
+                      source="prueba", location="Medellín, Antioquia", description=f"{desc} Medellín, presencial.")
+            reason = ap.profile_ok(job)  # coincidencias con tu HV, como en una vacante real
+            msg = ap.build_message(job, to)
+            area = ap.experience_for(job)[0]
+            msg.replace_header("Subject", f"[PRUEBA {area}] {msg['Subject']}")
+            server.sendmail(ap.user, to, msg.as_string())
+            print(f"Prueba [{area}] enviada: {title} (coincidencias: {', '.join(job.matched_skills) or '-'};"
+                  f" perfil: {reason or 'cumple'})")
 
 
 if __name__ == "__main__":
